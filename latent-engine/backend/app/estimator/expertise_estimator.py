@@ -23,4 +23,30 @@ class ExpertiseEstimator(
         context: EstimationContext,
     ) -> ExpertiseEstimate:
 
-        raise NotImplementedError
+        contribution = (
+            self._policy.score(evidence)
+            * evidence.confidence
+            * context.learning_rate
+        )
+
+        new_score = (
+            current.raw_score
+            * context.decay_factor
+        ) + contribution
+
+        new_confidence = min(
+            1.0,
+            current.confidence
+            + (
+                evidence.confidence
+                * 0.1
+            ),
+        )
+
+        return ExpertiseEstimate(
+            developer_ref=current.developer_ref,
+            module_ref=current.module_ref,
+            raw_score=new_score,
+            confidence=new_confidence,
+            updated_at=context.current_time,
+        )
