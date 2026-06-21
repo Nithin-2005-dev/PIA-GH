@@ -24,6 +24,10 @@ from app.estimator.policies.rule_expertise_scoring_policy import (
     RuleExpertiseScoringPolicy,
 )
 
+from app.query.expertise_query_service import (
+    ExpertiseQueryService,
+)
+
 from app.ports.event_query import EventQuery
 
 
@@ -51,6 +55,10 @@ def main():
         estimator,
     )
 
+    query_service = ExpertiseQueryService(
+        projection,
+    )
+
     context = EstimationContext(
         current_time=datetime.now(UTC),
         learning_rate=1.0,
@@ -61,7 +69,7 @@ def main():
         EventQuery(
             identifier="facebook/react",
             filters={
-                "per_page": 1,
+                "per_page": 10,
             },
         )
     )
@@ -79,11 +87,48 @@ def main():
                 context,
             )
 
-    print("\n=== EXPERTISE ESTIMATES ===\n")
+    module_id = (
+        "packages/react-devtools-facade/src/DevToolsFacade.js"
+    )
 
-    for estimate in projection.all_estimates():
+    results = query_service.top_experts(
+        module_id=module_id,
+    )
 
-        print(estimate)
+    print("\n=== TOP EXPERTS ===\n")
+
+    print(f"Module: {module_id}\n")
+
+    for rank, result in enumerate(
+        results,
+        start=1,
+    ):
+
+        estimate = result.estimate
+
+        print(f"Rank #{rank}")
+
+        print(
+            f"Developer: "
+            f"{estimate.developer_ref.id}"
+        )
+
+        print(
+            f"Raw Score: "
+            f"{estimate.raw_score}"
+        )
+
+        print(
+            f"Confidence: "
+            f"{estimate.confidence}"
+        )
+
+        print(
+            f"Effective Score: "
+            f"{result.effective_score}"
+        )
+
+        print("-" * 60)
 
 
 if __name__ == "__main__":

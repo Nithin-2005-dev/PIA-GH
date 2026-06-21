@@ -23,8 +23,14 @@ class ExpertiseEstimator(
         context: EstimationContext,
     ) -> ExpertiseEstimate:
 
+        strength = evidence.metadata.get(
+            "strength",
+            1.0,
+        )
+
         contribution = (
             self._policy.score(evidence)
+            * strength
             * evidence.confidence
             * context.learning_rate
         )

@@ -3,7 +3,12 @@ import os
 from app.adapters.github.adapter import GitHubAdapter
 from app.adapters.github.rest_gateway import GitHubRestGateway
 
-from app.extractor.expertise_extractor import ExpertiseExtractor
+from app.extractor.expertise_extractor import (
+    ExpertiseExtractor,
+)
+from app.extractor.policies.github_commit_strength_policy import (
+    GitHubCommitStrengthPolicy,
+)
 
 from app.ports.event_query import EventQuery
 
@@ -20,7 +25,9 @@ def main():
         gateway=gateway,
     )
 
-    extractor = ExpertiseExtractor()
+    extractor = ExpertiseExtractor(
+        GitHubCommitStrengthPolicy(),
+    )
 
     query = EventQuery(
         identifier="facebook/react",

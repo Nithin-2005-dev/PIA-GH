@@ -6,12 +6,24 @@ from app.domain.event import Event
 from app.domain.event_type import EventType
 from app.domain.predicate_type import PredicateType
 
+from app.extractor.policies.evidence_strength_policy import (
+    EvidenceStrengthPolicy,
+)
+
 from .evidence_extractor import EvidenceExtractor
 
 
 class ExpertiseExtractor(
     EvidenceExtractor
 ):
+
+    def __init__(
+        self,
+        strength_policy: EvidenceStrengthPolicy,
+    ):
+        self._strength_policy = (
+            strength_policy
+        )
 
     def extract(
         self,
@@ -20,6 +32,11 @@ class ExpertiseExtractor(
 
         if event.type != EventType.COMMIT:
             return []
+
+        strength = (
+            self._strength_policy
+            .strength(event)
+        )
 
         evidence = []
 
@@ -43,7 +60,7 @@ class ExpertiseExtractor(
                     confidence=1.0,
 
                     metadata={
-                        "source": "commit",
+                        "strength": strength,
                     },
                 )
             )
