@@ -1,5 +1,5 @@
-from domain.evidence import Evidence
-from domain.expertise_estimate import ExpertiseEstimate
+from app.domain.evidence import Evidence
+from app.domain.expertise_estimate import ExpertiseEstimate
 
 from .latent_state_estimator import LatentStateEstimator
 from .policies.evidence_scoring_policy import EvidenceScoringPolicy

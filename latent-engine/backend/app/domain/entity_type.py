@@ -1,10 +1,11 @@
 from enum import Enum
 
 
-class EventType(Enum):
-    COMMIT = "COMMIT"
+class EntityType(Enum):
+    DEVELOPER = "DEVELOPER"
+    MODULE = "MODULE"
+    FILE = "FILE"
+    REPOSITORY = "REPOSITORY"
     PULL_REQUEST = "PULL_REQUEST"
-    REVIEW = "REVIEW"
     ISSUE = "ISSUE"
     RELEASE = "RELEASE"
-    COMMENT = "COMMENT"

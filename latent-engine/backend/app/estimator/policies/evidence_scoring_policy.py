@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from domain.evidence import Evidence
+from app.domain.evidence import Evidence
 
 
 class EvidenceScoringPolicy(ABC):

@@ -1,5 +1,5 @@
-from domain.evidence import Evidence
-from domain.predicate_type import PredicateType
+from app.domain.evidence import Evidence
+from app.domain.predicate_type import PredicateType
 
 from .evidence_scoring_policy import EvidenceScoringPolicy
 

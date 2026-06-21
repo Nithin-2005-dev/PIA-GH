@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from domain.evidence import Evidence
+from app.domain.evidence import Evidence
 
 from .estimation_context import EstimationContext
 
