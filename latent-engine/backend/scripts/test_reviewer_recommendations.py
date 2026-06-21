@@ -3,7 +3,9 @@ from datetime import UTC, datetime
 
 from app.adapters.github.adapter import GitHubAdapter
 from app.adapters.github.rest_gateway import GitHubRestGateway
-
+from app.estimator.policies.exponential_decay_policy import (
+    ExponentialDecayPolicy,
+)
 from app.extractor.expertise_extractor import (
     ExpertiseExtractor,
 )
@@ -55,7 +57,8 @@ def main():
     )
 
     estimator = ExpertiseEstimator(
-        RuleExpertiseScoringPolicy(),
+    RuleExpertiseScoringPolicy(),
+    ExponentialDecayPolicy(),
     )
 
     projection = ExpertiseProjection(
@@ -76,7 +79,6 @@ def main():
     context = EstimationContext(
         current_time=datetime.now(UTC),
         learning_rate=1.0,
-        decay_factor=1.0,
     )
 
     events = adapter.collect(

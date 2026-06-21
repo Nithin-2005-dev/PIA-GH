@@ -2,7 +2,12 @@ from app.domain.evidence import Evidence
 from app.domain.expertise_estimate import ExpertiseEstimate
 
 from .latent_state_estimator import LatentStateEstimator
-from .policies.evidence_scoring_policy import EvidenceScoringPolicy
+from .policies.evidence_scoring_policy import (
+    EvidenceScoringPolicy,
+)
+from .policies.decay_policy import (
+    DecayPolicy,
+)
 from .estimation_context import EstimationContext
 
 
@@ -13,8 +18,15 @@ class ExpertiseEstimator(
     def __init__(
         self,
         scoring_policy: EvidenceScoringPolicy,
+        decay_policy: DecayPolicy,
     ):
-        self._policy = scoring_policy
+        self._scoring_policy = (
+            scoring_policy
+        )
+
+        self._decay_policy = (
+            decay_policy
+        )
 
     def estimate(
         self,
@@ -29,16 +41,26 @@ class ExpertiseEstimator(
         )
 
         contribution = (
-            self._policy.score(evidence)
+            self._scoring_policy.score(
+                evidence
+            )
             * strength
             * evidence.confidence
             * context.learning_rate
         )
 
+        decayed_score = (
+            self._decay_policy.apply(
+                score=current.raw_score,
+                last_updated=current.updated_at,
+                current_time=context.current_time,
+            )
+        )
+
         new_score = (
-            current.raw_score
-            * context.decay_factor
-        ) + contribution
+            decayed_score
+            + contribution
+        )
 
         new_confidence = min(
             1.0,
