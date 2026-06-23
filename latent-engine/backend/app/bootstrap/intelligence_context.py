@@ -54,6 +54,30 @@ from app.health.policies.organizational_health_policy import (
     OrganizationalHealthPolicy,
 )
 
+from app.history.health_projection import (
+    HealthProjection,
+)
+
+from app.history.history_service import (
+    HistoryService,
+)
+
+from app.forecasting.forecast_service import (
+    ForecastService,
+)
+
+from app.forecasting.linear_forecast_policy import (
+    LinearForecastPolicy,
+)
+
+from app.forecasting.forecast_pipeline_service import (
+    ForecastPipelineService,
+)
+
+from app.forecasting.future_risk_pipeline_service import (
+    FutureRiskPipelineService,
+)
+
 from app.knowledge_transfer.transfer_service import (
     TransferService,
 )
@@ -114,6 +138,35 @@ class IntelligenceContext:
         self.health_service = (
             HealthService(
                 OrganizationalHealthPolicy()
+            )
+        )
+
+        self.health_projection = (
+            HealthProjection()
+        )
+
+        self.history_service = (
+            HistoryService(
+                self.health_projection
+            )
+        )
+
+        self.forecast_service = (
+            ForecastService(
+                LinearForecastPolicy()
+            )
+        )
+
+        self.forecast_pipeline_service = (
+            ForecastPipelineService(
+                self.history_service,
+                self.forecast_service,
+            )
+        )
+
+        self.future_risk_pipeline_service = (
+            FutureRiskPipelineService(
+                self.forecast_pipeline_service
             )
         )
 

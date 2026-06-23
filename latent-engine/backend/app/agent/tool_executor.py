@@ -1,32 +1,33 @@
-from app.agent.agent_response import (
-    AgentResponse,
-)
-
-from app.agent.tool_route import (
-    ToolRoute,
-)
-
-from app.agent.adapters.risk_adapter import (
-    RiskAdapter,
-)
-
-from app.agent.adapters.forecast_adapter import (
+from .adapters.forecast_adapter import (
     ForecastAdapter,
 )
 
-from app.agent.adapters.intervention_adapter import (
+from .adapters.intervention_adapter import (
     InterventionAdapter,
 )
 
-from app.agent.adapters.simulation_adapter import (
+from .adapters.risk_adapter import (
+    RiskAdapter,
+)
+
+from .adapters.simulation_adapter import (
     SimulationAdapter,
 )
-from app.agent.adapters.successor_adapter import (
+
+from .adapters.successor_adapter import (
     SuccessorAdapter,
 )
 
-from app.agent.adapters.transfer_adapter import (
+from .adapters.transfer_adapter import (
     TransferAdapter,
+)
+
+from .agent_response import (
+    AgentResponse,
+)
+
+from .tool_route import (
+    ToolRoute,
 )
 
 
@@ -44,7 +45,9 @@ class ToolExecutor:
         )
 
         self._forecast = (
-            ForecastAdapter()
+            ForecastAdapter(
+                intelligence_context
+            )
         )
 
         self._intervention = (
@@ -54,7 +57,7 @@ class ToolExecutor:
         self._simulation = (
             SimulationAdapter()
         )
-        
+
         self._successor = (
             SuccessorAdapter(
                 intelligence_context
@@ -62,7 +65,9 @@ class ToolExecutor:
         )
 
         self._transfer = (
-            TransferAdapter(intelligence_context)
+            TransferAdapter(
+                intelligence_context
+            )
         )
 
     def execute(
