@@ -25,15 +25,30 @@ from app.simulation.simulation_service import (
 
 class SimulationAdapter:
 
-    def execute(self):
+    def execute(
+        self,
+        context,
+    ):
+
+        module_id = (
+            context.module_id
+            or
+            "auth.py"
+        )
+
+        developer_id = (
+            context.developer_id
+            or
+            "alice"
+        )
 
         module = EntityRef(
-            id="auth.py",
+            id=module_id,
             type=EntityType.FILE,
         )
 
         owner = EntityRef(
-            id="alice",
+            id=developer_id,
             type=EntityType.DEVELOPER,
         )
 

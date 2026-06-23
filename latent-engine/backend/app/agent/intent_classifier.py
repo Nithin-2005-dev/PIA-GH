@@ -37,6 +37,7 @@ class IntentClassifier:
             return (
                 QuestionIntent.SIMULATION
             )
+        
 
         if (
             "forecast" in question
@@ -48,6 +49,36 @@ class IntentClassifier:
 
             return (
                 QuestionIntent.FORECAST
+            )
+        
+        if (
+        "take over" in question
+        or
+        "successor" in question
+        or
+        "replace" in question
+        ):
+            return (
+            QuestionIntent.SUCCESSOR
+        )
+
+        if (
+
+            "knowledge transfer" in question
+
+            or "transfer plan" in question
+
+            or "invest knowledge" in question
+
+            or "train" in question
+
+            or "mentor" in question
+
+            or "learn" in question
+
+        ):
+            return (
+                QuestionIntent.TRANSFER
             )
 
         return (

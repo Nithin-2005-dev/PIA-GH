@@ -17,3 +17,11 @@ class ToolRoute(
     SIMULATION = (
         "Simulation Engine"
     )
+    
+    SUCCESSOR = (
+    "Successor Recommendation"
+)
+
+    TRANSFER = (
+        "Knowledge Transfer"
+    )

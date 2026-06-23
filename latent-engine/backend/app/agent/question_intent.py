@@ -13,3 +13,7 @@ class QuestionIntent(
     INTERVENTION = "INTERVENTION"
 
     SIMULATION = "SIMULATION"
+    
+    SUCCESSOR = "SUCCESSOR"
+
+    TRANSFER = "TRANSFER"

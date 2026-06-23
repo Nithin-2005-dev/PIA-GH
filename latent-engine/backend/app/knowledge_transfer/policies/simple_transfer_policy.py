@@ -28,10 +28,30 @@ class SimpleTransferPolicy(
         concentration_reports,
     ):
 
-        ownership_by_module = {
-            ownership.module_ref.id: ownership
-            for ownership in ownerships
-        }
+        ownership_by_module = {}
+
+        for ownership in ownerships:
+
+            module_id = (
+                ownership.module_ref.id
+            )
+
+            existing = (
+                ownership_by_module.get(
+                    module_id
+                )
+            )
+
+            if (
+                existing is None
+                or
+                ownership.ownership_percentage
+                >
+                existing.ownership_percentage
+            ):
+                ownership_by_module[
+                    module_id
+                ] = ownership
 
         successor_by_module = {}
 

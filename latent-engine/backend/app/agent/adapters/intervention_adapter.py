@@ -29,10 +29,19 @@ from app.intervention.intervention_planner import (
 
 class InterventionAdapter:
 
-    def execute(self):
+    def execute(
+        self,
+        context,
+    ):
+
+        module_id = (
+            context.module_id
+            or
+            "payments.py"
+        )
 
         module = EntityRef(
-            id="payments.py",
+            id=module_id,
             type=EntityType.FILE,
         )
 

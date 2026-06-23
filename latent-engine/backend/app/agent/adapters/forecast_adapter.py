@@ -17,10 +17,19 @@ from app.forecasting.future_risk_service import (
 
 class ForecastAdapter:
 
-    def execute(self):
+    def execute(
+        self,
+        context,
+    ):
+
+        module_id = (
+            context.module_id
+            or
+            "payments.py"
+        )
 
         module = EntityRef(
-            id="payments.py",
+            id=module_id,
             type=EntityType.FILE,
         )
 
