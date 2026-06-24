@@ -86,6 +86,21 @@ from app.knowledge_transfer.policies.simple_transfer_policy import (
     SimpleTransferPolicy,
 )
 
+from app.simulation.readiness_service import (
+    ReadinessService,
+)
+
+from app.simulation.policies.expertise_readiness_policy import (
+    ExpertiseReadinessPolicy,
+)
+
+from app.simulation.readiness_service import (
+    ReadinessService,
+)
+
+from app.simulation.policies.expertise_readiness_policy import (
+    ExpertiseReadinessPolicy,
+)
 
 class IntelligenceContext:
 
@@ -173,5 +188,21 @@ class IntelligenceContext:
         self.transfer_service = (
             TransferService(
                 SimpleTransferPolicy()
+            )
+        )
+        
+        self.readiness_service = (
+            ReadinessService(
+                self.successor_service,
+                self.query_service,
+                ExpertiseReadinessPolicy(),
+            )
+        )
+        
+        self.readiness_service = (
+            ReadinessService(
+                self.successor_service,
+                self.query_service,
+                ExpertiseReadinessPolicy(),
             )
         )

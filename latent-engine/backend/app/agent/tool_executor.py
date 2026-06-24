@@ -51,11 +51,11 @@ class ToolExecutor:
         )
 
         self._intervention = (
-            InterventionAdapter()
+            InterventionAdapter(intelligence_context)
         )
 
         self._simulation = (
-            SimulationAdapter()
+            SimulationAdapter(intelligence_context)
         )
 
         self._successor = (

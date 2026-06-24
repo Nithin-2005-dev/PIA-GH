@@ -29,6 +29,14 @@ from app.intervention.intervention_planner import (
 
 class InterventionAdapter:
 
+    def __init__(
+        self,
+        intelligence_context=None,
+    ):
+        self._intelligence = (
+            intelligence_context
+        )
+
     def execute(
         self,
         context,

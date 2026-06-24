@@ -25,6 +25,14 @@ from app.simulation.simulation_service import (
 
 class SimulationAdapter:
 
+    def __init__(
+        self,
+        intelligence_context=None,
+    ):
+        self._intelligence = (
+            intelligence_context
+        )
+
     def execute(
         self,
         context,
@@ -71,16 +79,59 @@ class SimulationAdapter:
             ),
         )
 
+        readiness_score = 0.60
+        successor_name = "unknown"
+
+        if (
+            self._intelligence
+            is not None
+        ):
+
+            successors = (
+                self._intelligence
+                .successor_service
+                .recommend(
+                    module_id,
+                    limit=1,
+                )
+            )
+
+            if successors:
+
+                successor_name = (
+                    successors[0]
+                    .developer_ref
+                    .id
+                )
+
+                readiness = (
+                    self._intelligence
+                    .readiness_service
+                    .readiness_of(
+                        successor_name,
+                        module_id,
+                    )
+                )
+
+                readiness_score = (
+                    readiness
+                    .readiness_score
+                )
+
         result = (
             SimulationService()
             .simulate_departure(
                 health_report=health_report,
                 ownership_estimate=ownership,
-                readiness_score=0.60,
+                readiness_score=(
+                    readiness_score
+                ),
             )
         )
 
         return (
+            f"Successor: "
+            f"{successor_name}\n"
             f"Health Before: "
             f"{result.health_before:.2f}\n"
             f"Health After: "
