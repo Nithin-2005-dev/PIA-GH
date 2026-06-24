@@ -48,35 +48,111 @@ class InterventionAdapter:
             "payments.py"
         )
 
-        module = EntityRef(
-            id=module_id,
-            type=EntityType.FILE,
-        )
+        if (
+            self._intelligence
+            is not None
+        ):
 
-        coverage = CoverageReport(
-            module_ref=module,
-            expert_count=1,
-            total_expertise=20,
-            coverage_score=10,
-            coverage_level="WEAK",
-        )
-
-        concentration = (
-            ConcentrationReport(
-                module_ref=module,
-                expert_count=3,
-                concentration_score=0.98,
-                concentration_level="HIGH",
+            estimates = (
+                self._intelligence
+                .projection
+                .all_estimates()
             )
-        )
 
-        severity = ForecastSeverity(
-            module_ref=module,
-            current_health=40,
-            predicted_health=10,
-            severity_score=0.75,
-            severity_level="EXTREME",
-        )
+            coverage_reports = (
+                self._intelligence
+                .coverage_service
+                .analyze(
+                    estimates
+                )
+            )
+
+            coverage = next(
+                report
+                for report
+                in coverage_reports
+                if (
+                    report
+                    .module_ref
+                    .id
+                    ==
+                    module_id
+                )
+            )
+
+            concentration_reports = (
+                self._intelligence
+                .concentration_service
+                .analyze(
+                    estimates
+                )
+            )
+
+            concentration = next(
+                report
+                for report
+                in concentration_reports
+                if (
+                    report
+                    .module_ref
+                    .id
+                    ==
+                    module_id
+                )
+            )
+
+            severities = (
+                self._intelligence
+                .future_risk_pipeline_service
+                .severities(
+                    horizon=3
+                )
+            )
+
+            severity = next(
+                item
+                for item
+                in severities
+                if (
+                    item
+                    .module_ref
+                    .id
+                    ==
+                    module_id
+                )
+            )
+
+        else:
+
+            module = EntityRef(
+                id=module_id,
+                type=EntityType.FILE,
+            )
+
+            coverage = CoverageReport(
+                module_ref=module,
+                expert_count=1,
+                total_expertise=20,
+                coverage_score=10,
+                coverage_level="WEAK",
+            )
+
+            concentration = (
+                ConcentrationReport(
+                    module_ref=module,
+                    expert_count=3,
+                    concentration_score=0.98,
+                    concentration_level="HIGH",
+                )
+            )
+
+            severity = ForecastSeverity(
+                module_ref=module,
+                current_health=40,
+                predicted_health=10,
+                severity_score=0.75,
+                severity_level="EXTREME",
+            )
 
         interventions = (
             InterventionImpactService()
@@ -94,7 +170,9 @@ class InterventionAdapter:
         plan = (
             InterventionPlanner()
             .create_plan(
-                module_ref=module,
+                module_ref=(
+                    coverage.module_ref
+                ),
                 interventions=interventions,
             )
         )

@@ -94,12 +94,8 @@ from app.simulation.policies.expertise_readiness_policy import (
     ExpertiseReadinessPolicy,
 )
 
-from app.simulation.readiness_service import (
-    ReadinessService,
-)
-
-from app.simulation.policies.expertise_readiness_policy import (
-    ExpertiseReadinessPolicy,
+from app.forecasting.forecast_severity_service import (
+    ForecastSeverityService,
 )
 
 class IntelligenceContext:
@@ -199,10 +195,6 @@ class IntelligenceContext:
             )
         )
         
-        self.readiness_service = (
-            ReadinessService(
-                self.successor_service,
-                self.query_service,
-                ExpertiseReadinessPolicy(),
-            )
+        self.forecast_severity_service = (
+            ForecastSeverityService()
         )
