@@ -98,6 +98,25 @@ from app.forecasting.forecast_severity_service import (
     ForecastSeverityService,
 )
 
+from app.organization.organization_risk_service import (
+    OrganizationRiskService,
+)
+
+from app.organization.organization_health_service import (
+    OrganizationHealthService,
+)
+
+from app.organization.organization_readiness_service import (
+    OrganizationReadinessService,
+)
+
+from app.organization.organization_transfer_service import (
+    OrganizationTransferService,
+)
+
+from app.organization.organization_dashboard_service import (
+    OrganizationDashboardService,
+)
 class IntelligenceContext:
 
     def __init__(
@@ -198,3 +217,32 @@ class IntelligenceContext:
         self.forecast_severity_service = (
             ForecastSeverityService()
         )
+        self.organization_risk_service = (
+            OrganizationRiskService(
+                self
+            )
+        )
+        
+        self.organization_health_service = (
+            OrganizationHealthService(
+                self
+            )
+        )
+        
+        self.organization_readiness_service = (
+        OrganizationReadinessService(
+            self
+        )
+    )
+    
+        self.organization_transfer_service = (
+            OrganizationTransferService(
+                self
+            )
+        )
+        
+        self.organization_dashboard_service = (
+        OrganizationDashboardService(
+            self
+        )
+    )
