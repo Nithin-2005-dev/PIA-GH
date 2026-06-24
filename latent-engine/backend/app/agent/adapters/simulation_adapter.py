@@ -44,21 +44,55 @@ class SimulationAdapter:
             "auth.py"
         )
 
-        developer_id = (
-            context.developer_id
-            or
-            "alice"
-        )
-
         module = EntityRef(
             id=module_id,
             type=EntityType.FILE,
+        )
+
+        # M27.1 — Ground Ownership: replace hardcoded fixture with real ownership data
+        owners = None
+        if self._intelligence is not None:
+            owners = (
+                self._intelligence
+                .ownership_service
+                .owners_of(
+                    module_id
+                )
+            )
+
+        if not owners:
+            return "No ownership data found."
+
+        ownership = owners[0]
+
+        # M27.3 — Ground Departure Target: use primary owner as default departure candidate
+        developer_id = (
+            context.developer_id
+            or
+            ownership.owner_ref.id
         )
 
         owner = EntityRef(
             id=developer_id,
             type=EntityType.DEVELOPER,
         )
+
+        # Find the ownership estimate for the specific developer
+        developer_ownership = next(
+            (
+                o for o in owners
+                if o.owner_ref.id == developer_id
+            ),
+            None,
+        )
+
+        if developer_ownership is None:
+            return (
+                f"No ownership data found for "
+                f"developer '{developer_id}'."
+            )
+
+        ownership = developer_ownership
 
         health_report = HealthReport(
             module_ref=module,
@@ -67,16 +101,6 @@ class SimulationAdapter:
             coverage_score=80,
             concentration_score=0.30,
             bus_factor=4,
-        )
-
-        ownership = OwnershipEstimate(
-            owner_ref=owner,
-            module_ref=module,
-            ownership_percentage=0.75,
-            effective_score=120,
-            ownership_level=(
-                OwnershipLevel.PRIMARY
-            ),
         )
 
         readiness_score = 0.60
@@ -117,6 +141,60 @@ class SimulationAdapter:
                     readiness
                     .readiness_score
                 )
+
+            # M27.2 — Ground Health: replace hardcoded fixture with real health pipeline
+            estimates = (
+                self._intelligence
+                .projection
+                .all_estimates()
+            )
+
+            coverage_reports = (
+                self._intelligence
+                .coverage_service
+                .analyze(
+                    estimates
+                )
+            )
+
+            concentration_reports = (
+                self._intelligence
+                .concentration_service
+                .analyze(
+                    estimates
+                )
+            )
+
+            bus_factor = (
+                self._intelligence
+                .bus_factor_service
+                .analyze(
+                    module_id
+                )
+            )
+
+            health_reports = (
+                self._intelligence
+                .health_service
+                .analyze(
+                    coverage_reports,
+                    concentration_reports,
+                    [bus_factor],
+                )
+            )
+
+            health_report = next(
+                (
+                    report
+                    for report in health_reports
+                    if report.module_ref.id
+                    == module_id
+                ),
+                None,
+            )
+
+            if health_report is None:
+                return "No health data found."
 
         result = (
             SimulationService()
