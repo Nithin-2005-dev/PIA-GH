@@ -90,7 +90,7 @@ def main():
     commit_limit = int(
         os.getenv(
             "PIA_COMMITS",
-            "50",
+            "10",
         )
     )
 
