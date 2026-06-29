@@ -76,6 +76,16 @@ app/measurement
   benchmark_datasets.py
                      benchmark datasets and scopes
   knowledge_api.py   signal and measurement knowledge APIs
+  scientific_catalog.py
+                     enterprise software measurement catalog
+  accuracy_profiles.py
+                     expected error, bias, reliability and failure metadata
+  scientific_validation.py
+                     scientific validation reports and catalog validation
+  confidence_calibration.py
+                     empirical confidence calibration
+  test_corpus.py     synthetic validation datasets
+  scientific_api.py  benchmark and validation APIs
   statistical.py     mean, variance, correlation, entropy, KL divergence
   statistical_pipeline.py
                      distribution, outlier and confidence interval report
@@ -448,6 +458,23 @@ SoftwareSignal
 
 This allows future adapters to register new signals dynamically while preserving
 the Evidence contract.
+
+## Scientific Validation
+
+M34 adds scientific validation after signal intelligence and before evidence:
+
+```text
+MeasurementDefinition
+  -> AccuracyProfile
+  -> ScientificValidationEngine
+  -> BenchmarkDatasetRegistry
+  -> ConfidenceCalibrationModel
+  -> ScientificMeasurementApi
+```
+
+The enterprise catalog gives each measurement a scientific definition, business
+interpretation, formula, required signals, uncertainty model, benchmark
+strategy, validation rules, assumptions, limitations and version history.
 
 ## Testing Strategy
 

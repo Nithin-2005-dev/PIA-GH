@@ -12,6 +12,9 @@ from .execution import MeasurementExecutionPlanner
 from .mapping import SignalToMeasurementMapper
 from .ontology import MeasurementOntology
 from .registry import MeasurementRegistry
+from .scientific_api import ScientificMeasurementApi
+from .scientific_catalog import EnterpriseMeasurementCatalog
+from .scientific_validation import ScientificValidationEngine
 from .semantic_graph import SemanticMeasurementGraph
 from .signal_classifier import SemanticSignalClassifier
 from .signal_ontology import SignalOntology
@@ -22,6 +25,7 @@ __all__ = [
     "DefaultMeasurementCatalog",
     "DefaultSignalCatalog",
     "EnterpriseAccuracyPipeline",
+    "EnterpriseMeasurementCatalog",
     "Measurement",
     "MeasurementContract",
     "MeasurementConcept",
@@ -38,4 +42,6 @@ __all__ = [
     "SignalOntology",
     "SignalRegistry",
     "SignalToMeasurementMapper",
+    "ScientificMeasurementApi",
+    "ScientificValidationEngine",
 ]

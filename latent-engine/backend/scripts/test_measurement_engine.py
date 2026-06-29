@@ -26,9 +26,12 @@ from app.measurement.benchmark_datasets import BenchmarkDatasetRegistry
 from app.measurement.benchmark_datasets import BenchmarkScope
 from app.measurement.catalog import DefaultMeasurementCatalog
 from app.measurement.accuracy import EnterpriseAccuracyPipeline
+from app.measurement.accuracy_profiles import AccuracyProfileRegistry
 from app.measurement.active import ActiveMeasurementService
 from app.measurement.compression import ApproximateHistogramBuilder
 from app.measurement.compression import ReservoirSampler
+from app.measurement.confidence_calibration import ConfidenceCalibrationModel
+from app.measurement.confidence_calibration import ConfidenceObservation
 from app.measurement.contracts import MeasurementContract
 from app.measurement.contracts import MeasurementContractValidator
 from app.measurement.contracts import MeasurementLifecycle
@@ -61,6 +64,10 @@ from app.measurement.mql import MqlParser
 from app.measurement.ontology import MeasurementOntology
 from app.measurement.packs import MeasurementMarketplace
 from app.measurement.packs import MeasurementPack
+from app.measurement.scientific_api import ScientificMeasurementApi
+from app.measurement.scientific_catalog import EnterpriseMeasurementCatalog
+from app.measurement.scientific_validation import CatalogValidationService
+from app.measurement.scientific_validation import ScientificValidationEngine
 from app.measurement.recompute import MeasurementDependencyGraph
 from app.measurement.semantic_graph import ConceptRelationship
 from app.measurement.semantic_graph import SemanticMeasurementEdge
@@ -75,6 +82,7 @@ from app.measurement.statistical_pipeline import StatisticsPipeline
 from app.measurement.store import MeasurementCache
 from app.measurement.store import TemporalMeasurementStore
 from app.measurement.streaming import StreamingMeasurementEngine
+from app.measurement.test_corpus import MeasurementTestCorpus
 
 
 class DemoCalibrationModel(MeasurementCalibrationModel):
@@ -443,6 +451,134 @@ def main():
         "code_churn"
     )
     assert knowledge_api.standards_references()
+
+    enterprise_registry = (
+        EnterpriseMeasurementCatalog
+        .build_registry()
+    )
+    enterprise_knowledge = (
+        EnterpriseMeasurementCatalog
+        .build_knowledge_base()
+    )
+    accuracy_profiles = (
+        EnterpriseMeasurementCatalog
+        .build_accuracy_profiles()
+    )
+
+    assert len(
+        enterprise_registry.all()
+    ) >= 50
+    assert enterprise_knowledge.get(
+        "cyclomatic_complexity"
+    ).scientific_definition
+    assert accuracy_profiles.get(
+        "cyclomatic_complexity"
+    ).minimum_required_signals
+
+    enterprise_benchmarks = BenchmarkDatasetRegistry()
+    enterprise_benchmarks.register(
+        BenchmarkDataset(
+            id="cyclomatic-complexity-language",
+            measurement_id="cyclomatic_complexity",
+            scope=BenchmarkScope.PROGRAMMING_LANGUAGE,
+            values=(
+                4,
+                8,
+                12,
+                20,
+            ),
+            version="1.0",
+            source="synthetic",
+            metadata={
+                "language": "python",
+            },
+        )
+    )
+
+    validation_engine = ScientificValidationEngine(
+        enterprise_knowledge,
+        accuracy_profiles,
+        enterprise_benchmarks,
+    )
+
+    validation_report = (
+        validation_engine
+        .validate_definition(
+            enterprise_registry.get(
+                "cyclomatic_complexity"
+            )
+        )
+    )
+
+    assert validation_report.status in {
+        ValidationStatus.PASSED,
+        ValidationStatus.WARNING,
+    }
+    assert validation_report.mathematical.status in {
+        ValidationStatus.PASSED,
+        ValidationStatus.WARNING,
+    }
+
+    catalog_reports = CatalogValidationService(
+        enterprise_registry,
+        validation_engine,
+    ).validate_all()
+
+    assert len(
+        catalog_reports
+    ) == len(
+        enterprise_registry.all()
+    )
+
+    calibration_report = (
+        ConfidenceCalibrationModel()
+        .calibrate(
+            "cyclomatic_complexity",
+            0.8,
+            [
+                ConfidenceObservation(
+                    measurement_id="cyclomatic_complexity",
+                    predicted_confidence=0.8,
+                    observed_success=True,
+                ),
+                ConfidenceObservation(
+                    measurement_id="cyclomatic_complexity",
+                    predicted_confidence=0.8,
+                    observed_success=False,
+                ),
+            ],
+        )
+    )
+
+    assert calibration_report.sample_size == 2
+    assert calibration_report.calibration_error >= 0
+
+    test_corpus = MeasurementTestCorpus.default()
+
+    assert test_corpus.get(
+        "synthetic_commit_history_small"
+    ).expected_measurements
+
+    scientific_api = ScientificMeasurementApi(
+        validation_engine=validation_engine,
+        benchmark_registry=enterprise_benchmarks,
+        knowledge_base=enterprise_knowledge,
+        accuracy_profiles=accuracy_profiles,
+        standards_catalog=standards,
+    )
+
+    assert scientific_api.benchmark_lookup(
+        "cyclomatic_complexity"
+    )
+    assert scientific_api.interpretation(
+        "cyclomatic_complexity"
+    )
+    assert scientific_api.accuracy_profile(
+        "cyclomatic_complexity"
+    )
+    assert scientific_api.research_references(
+        "cyclomatic_complexity"
+    )
 
     contract = MeasurementContract(
         definition=registry.get(
