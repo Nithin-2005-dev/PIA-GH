@@ -17,9 +17,13 @@ from app.domain.event import Event
 from app.domain.event_type import EventType
 from app.measurement.domain import MeasurementContext
 from app.measurement.domain import MeasurementDefinition
+from app.measurement.domain import SoftwareSignal
 from app.measurement.domain import MeasurementUnit
 from app.measurement.domain import ValidationStatus
 from app.measurement.benchmark import BenchmarkEngine
+from app.measurement.benchmark_datasets import BenchmarkDataset
+from app.measurement.benchmark_datasets import BenchmarkDatasetRegistry
+from app.measurement.benchmark_datasets import BenchmarkScope
 from app.measurement.catalog import DefaultMeasurementCatalog
 from app.measurement.accuracy import EnterpriseAccuracyPipeline
 from app.measurement.active import ActiveMeasurementService
@@ -28,6 +32,7 @@ from app.measurement.compression import ReservoirSampler
 from app.measurement.contracts import MeasurementContract
 from app.measurement.contracts import MeasurementContractValidator
 from app.measurement.contracts import MeasurementLifecycle
+from app.measurement.domain_packs import DefaultDomainPacks
 from app.measurement.dsl import MeasurementDslParser
 from app.measurement.engine import MeasurementEngine
 from app.measurement.execution import CandidateMeasurementPath
@@ -42,6 +47,12 @@ from app.measurement.fusion import ProbabilisticFusionEngine
 from app.measurement.lineage import MeasurementExplainer
 from app.measurement.lineage import MeasurementLineageService
 from app.measurement.lineage_query import MeasurementLineageQueryEngine
+from app.measurement.knowledge_api import MeasurementKnowledgeApi
+from app.measurement.mapping import MappingCardinality
+from app.measurement.mapping import SignalMeasurementMapping
+from app.measurement.mapping import SignalMeasurementMappingRegistry
+from app.measurement.mapping import SignalToMeasurementMapper
+from app.measurement.measurement_knowledge import DefaultSoftwareMeasurementKnowledge
 from app.measurement.ml import CalibrationResult
 from app.measurement.ml import MeasurementCalibrationModel
 from app.measurement.ml import MlCalibrationService
@@ -54,6 +65,12 @@ from app.measurement.recompute import MeasurementDependencyGraph
 from app.measurement.semantic_graph import ConceptRelationship
 from app.measurement.semantic_graph import SemanticMeasurementEdge
 from app.measurement.semantic_graph import SemanticMeasurementGraph
+from app.measurement.signal_classifier import SemanticSignalClassifier
+from app.measurement.signal_ontology import SignalOntology
+from app.measurement.signal_validation import SemanticMappingValidator
+from app.measurement.signal_validation import SignalDefinitionValidator
+from app.measurement.signals import DefaultSignalCatalog
+from app.measurement.standards import StandardsCatalog
 from app.measurement.statistical_pipeline import StatisticsPipeline
 from app.measurement.store import MeasurementCache
 from app.measurement.store import TemporalMeasurementStore
@@ -280,6 +297,152 @@ def main():
     assert registry.get(
         "code_churn"
     ).concept_id == "change_impact"
+
+    signal_registry = DefaultSignalCatalog.build()
+    signal_definition = signal_registry.get(
+        "git.total_additions"
+    )
+
+    software_signal = SoftwareSignal(
+        id="git.total_additions",
+        name="total_additions",
+        source="github",
+        value=40,
+        unit=MeasurementUnit.LOC,
+        source_event_id="event-1",
+    )
+
+    assert (
+        SignalDefinitionValidator()
+        .validate_value(
+            software_signal,
+            signal_definition,
+        )
+        .status
+        == ValidationStatus.PASSED
+    )
+
+    signal_ontology = SignalOntology.default()
+    classification = SemanticSignalClassifier(
+        signal_registry,
+        signal_ontology,
+    ).classify(
+        software_signal
+    )
+
+    assert classification.category == "source_control"
+
+    mapping_registry = SignalMeasurementMappingRegistry()
+    mapping_registry.register(
+        SignalMeasurementMapping(
+            id="git-additions-to-churn",
+            version="1.0",
+            signal_ids=(
+                "git.total_additions",
+                "git.total_deletions",
+            ),
+            concept_id="change_impact",
+            measurement_definition_ids=(
+                "code_churn",
+            ),
+            evaluator="change_complexity_evaluator",
+            cardinality=MappingCardinality.MANY_TO_ONE,
+            confidence=0.95,
+            explanation=(
+                "line additions and deletions compose code churn"
+            ),
+            trace=(
+                "signal_registry",
+                "measurement_registry",
+            ),
+        )
+    )
+
+    resolution = SignalToMeasurementMapper(
+        registry,
+        mapping_registry,
+    ).resolve(
+        software_signal,
+        classification,
+    )
+
+    assert resolution.definitions[0].id == "code_churn"
+
+    assert (
+        SemanticMappingValidator()
+        .validate(
+            classification,
+            resolution,
+        )
+        .status
+        == ValidationStatus.PASSED
+    )
+
+    standards = StandardsCatalog.default()
+
+    assert standards.get(
+        "ISO-15939"
+    ).organization == "ISO/IEC"
+
+    domain_packs = DefaultDomainPacks.build()
+
+    assert any(
+        pack.id == "code-quality"
+        for pack in domain_packs
+    )
+
+    measurement_knowledge = (
+        DefaultSoftwareMeasurementKnowledge
+        .build()
+    )
+
+    assert measurement_knowledge.get(
+        "code_churn"
+    ).business_definition
+
+    benchmark_registry = BenchmarkDatasetRegistry()
+    benchmark_registry.register(
+        BenchmarkDataset(
+            id="repo-code-churn",
+            measurement_id="code_churn",
+            scope=BenchmarkScope.REPOSITORY,
+            values=(
+                5,
+                10,
+                20,
+                50,
+            ),
+            version="1.0",
+            source="internal",
+            metadata={
+                "repository": "latent-engine",
+            },
+        )
+    )
+
+    knowledge_api = MeasurementKnowledgeApi(
+        signal_registry=signal_registry,
+        measurement_registry=registry,
+        mapping_registry=mapping_registry,
+        signal_ontology=signal_ontology,
+        measurement_knowledge=measurement_knowledge,
+        benchmark_registry=benchmark_registry,
+        standards_catalog=standards,
+    )
+
+    assert knowledge_api.signal_definition(
+        "git.total_additions"
+    ).display_name == "Total Additions"
+    assert knowledge_api.measurement_definition(
+        "code_churn"
+    ).name == "Code Churn"
+    assert knowledge_api.mappings_for_signal(
+        "git.total_additions"
+    )
+    assert knowledge_api.benchmark_metadata(
+        "code_churn"
+    )
+    assert knowledge_api.standards_references()
 
     contract = MeasurementContract(
         definition=registry.get(

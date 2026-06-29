@@ -62,6 +62,20 @@ app/measurement
   packs.py           metric packs and marketplace installation
   semantic_graph.py  graph relationships between measurement concepts
   streaming.py       event-driven measurement updates
+  signals.py         universal signal registry
+  signal_ontology.py semantic signal ontology
+  signal_classifier.py
+                     layered signal classification
+  mapping.py         signal-to-measurement mapping
+  signal_validation.py
+                     signal and semantic mapping validation
+  standards.py       standards metadata catalog
+  domain_packs.py    domain measurement packs
+  measurement_knowledge.py
+                     scientific measurement knowledge base
+  benchmark_datasets.py
+                     benchmark datasets and scopes
+  knowledge_api.py   signal and measurement knowledge APIs
   statistical.py     mean, variance, correlation, entropy, KL divergence
   statistical_pipeline.py
                      distribution, outlier and confidence interval report
@@ -417,6 +431,23 @@ Measurement Layer integrity gate. It should never calculate raw metrics itself.
 Before evidence, each measurement should be normalized, validated,
 confidence-scored, uncertainty-aware, benchmarked when a cohort exists,
 explainable, versioned, reproducible and traceable through lineage.
+
+## Signal Intelligence
+
+M33 adds signal intelligence before measurement execution:
+
+```text
+SoftwareSignal
+  -> SignalRegistry
+  -> SignalOntology
+  -> SemanticSignalClassifier
+  -> SignalToMeasurementMapper
+  -> MeasurementDefinition
+  -> MeasurementEngine
+```
+
+This allows future adapters to register new signals dynamically while preserving
+the Evidence contract.
 
 ## Testing Strategy
 
