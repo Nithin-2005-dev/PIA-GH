@@ -1,22 +1,22 @@
 from app.domain.event import Event
 
-from ..catalog import DefaultMeasurementCatalog
-from ..domain import Measurement
-from ..domain import MeasurementContext
-from ..domain import MeasurementDefinition
-from ..domain import MeasurementMethod
-from ..domain import MeasurementProvenance
-from ..domain import MeasurementTrace
-from ..domain import MeasurementUncertainty
-from ..domain import MeasurementUnit
-from ..domain import NormalizationMethod
-from ..ids import stable_measurement_id
-from ..interfaces import MeasurementEvaluator
-from .common import additions
-from .common import artifact_files
-from .common import deletions
-from .common import entropy
-from .common import files_changed
+from app.measurement.domain.catalog import DefaultMeasurementCatalog
+from app.measurement.domain import Measurement
+from app.measurement.domain import MeasurementContext
+from app.measurement.domain import MeasurementDefinition
+from app.measurement.domain import MeasurementMethod
+from app.measurement.domain import MeasurementProvenance
+from app.measurement.domain import MeasurementTrace
+from app.measurement.domain import MeasurementUncertainty
+from app.measurement.domain import MeasurementUnit
+from app.measurement.domain import NormalizationMethod
+from app.measurement.core.ids import stable_measurement_id
+from app.measurement.core.interfaces import MeasurementEvaluator
+from app.measurement.evaluators.common import additions
+from app.measurement.evaluators.common import artifact_files
+from app.measurement.evaluators.common import deletions
+from app.measurement.evaluators.common import entropy
+from app.measurement.evaluators.common import files_changed
 
 
 class ChangeComplexityEvaluator(MeasurementEvaluator):
@@ -269,3 +269,6 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
         return files_with_patch / len(
             files
         )
+
+
+
