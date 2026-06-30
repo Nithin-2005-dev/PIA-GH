@@ -21,6 +21,7 @@ The canonical architecture is:
 
 ```text
 Software Events
+  -> Vendor Adapter
   -> Observation Layer
   -> Measurement Operating System
   -> Evidence Intelligence Platform
@@ -35,6 +36,9 @@ Expertise.
 
 Expertise must never directly consume measurements.
 
+ADR 0005 refines the upstream boundary: Measurement consumes canonical
+`Observation` objects, not legacy events or vendor payloads.
+
 ## Consequences
 
 - Measurement responsibilities remain unchanged.
@@ -44,4 +48,3 @@ Expertise must never directly consume measurements.
 - Invalid evidence is blocked before Expertise.
 - Legacy `app.domain.evidence.Evidence` remains for backward compatibility, but
   production Measurement-to-Expertise flow uses `app.evidence.domain.Evidence`.
-

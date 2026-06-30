@@ -2,5 +2,5 @@
 GitHub Adapter
 
 Responsible for translating GitHub into
-our universal Event language.
+canonical Observation objects.
 """

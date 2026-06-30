@@ -5,7 +5,7 @@
 The production pipeline is:
 
 ```text
-Event -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
+Observation -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
 ```
 
 Do not add direct Measurement-to-Expertise dependencies. Evidence is the
@@ -80,4 +80,3 @@ python backend/scripts/test_evidence_platform.py
 The test uses real MeasurementEngine output and verifies immutability,
 validation, EQL, graph lineage, APIs, failed-measurement rejection, and
 streaming replay.
-

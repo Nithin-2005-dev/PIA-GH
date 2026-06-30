@@ -1,32 +1,28 @@
 # Ports Layer
 
-The ports layer defines the boundaries of the core system.
+The ports layer defines boundaries between the core system and external
+platforms.
 
-## Philosophy
+The core should never depend on GitHub, Jira, Slack, GitLab, Azure DevOps, or
+vendor SDK DTOs. It depends on abstract capabilities that return canonical
+observations.
 
-The core should never depend on:
+## ObservationSourcePort
 
-- GitHub
-- Jira
-- Slack
-- GitLab
-- Azure DevOps
-
-Instead, it depends only on abstract capabilities.
-
-## Current Ports
-
-### EventSourcePort
-
-Provides normalized domain Events from an external source.
+Provides immutable `Observation` objects from an external source.
 
 ```text
-Application
+External Platform
+        |
+        v
+Vendor Adapter
+        |
+        v
+ObservationSourcePort
+        |
+        v
+Canonical Observation
+```
 
-↓
-
-EventSourcePort
-
-↓
-
-Domain Events
+`EventSourcePort` remains as a deprecated import alias only. New adapters must
+return `app.observation.domain.Observation`.

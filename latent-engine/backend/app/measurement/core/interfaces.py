@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 
-from app.domain.event import Event
-
 from app.measurement.domain import Measurement, MeasurementContext, ValidationResult
+from app.observation.domain import Observation
 
 
 class MeasurementEvaluator(ABC):
@@ -10,7 +9,7 @@ class MeasurementEvaluator(ABC):
     @abstractmethod
     def evaluate(
         self,
-        event: Event,
+        observation: Observation,
         context: MeasurementContext,
     ) -> list[Measurement]:
         raise NotImplementedError

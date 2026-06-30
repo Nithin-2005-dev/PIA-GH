@@ -1,112 +1,74 @@
-from collections.abc import Mapping
 from math import log2
-from typing import Any
+
+from app.observation.domain import CommitFacts
+from app.observation.domain import FileChangeFacts
+from app.observation.domain import Observation
 
 
-def observation(
-    payload: Mapping[str, Any],
-) -> Mapping[str, Any]:
-    return payload.get(
-        "observation",
-        {},
-    )
-
-
-def commit_behavior(
-    payload: Mapping[str, Any],
-) -> Mapping[str, Any]:
-    return (
-        observation(payload)
-        .get(
-            "behavioral",
-            {},
-        )
-        .get(
-            "commit",
-            {},
-        )
-    )
+def commit_facts(
+    observation: Observation,
+) -> CommitFacts | None:
+    if isinstance(
+        observation.facts,
+        CommitFacts,
+    ):
+        return observation.facts
+    return None
 
 
 def artifact_files(
-    payload: Mapping[str, Any],
-) -> list[Mapping[str, Any]]:
-    return list(
-        observation(payload)
-        .get(
-            "artifact",
-            {},
-        )
-        .get(
-            "files",
-            [],
-        )
+    observation: Observation,
+) -> tuple[FileChangeFacts, ...]:
+    facts = commit_facts(
+        observation
     )
+    if facts is None:
+        return ()
+    return facts.files
 
 
 def total_changes(
-    payload: Mapping[str, Any],
+    observation: Observation,
 ) -> float:
+    facts = commit_facts(
+        observation
+    )
     return float(
-        commit_behavior(payload).get(
-            "total_changes",
-            payload.get(
-                "total_changes",
-                0,
-            ),
-        )
-        or 0
+        facts.total_changes if facts else 0
     )
 
 
 def additions(
-    payload: Mapping[str, Any],
+    observation: Observation,
 ) -> float:
+    facts = commit_facts(
+        observation
+    )
     return float(
-        commit_behavior(payload).get(
-            "total_additions",
-            payload.get(
-                "additions",
-                0,
-            ),
-        )
-        or 0
+        facts.total_additions if facts else 0
     )
 
 
 def deletions(
-    payload: Mapping[str, Any],
+    observation: Observation,
 ) -> float:
+    facts = commit_facts(
+        observation
+    )
     return float(
-        commit_behavior(payload).get(
-            "total_deletions",
-            payload.get(
-                "deletions",
-                0,
-            ),
-        )
-        or 0
+        facts.total_deletions if facts else 0
     )
 
 
 def files_changed(
-    payload: Mapping[str, Any],
+    observation: Observation,
 ) -> float:
-    files = artifact_files(
-        payload
-    )
-
-    if files:
-        return float(
-            len(files)
-        )
-
     return float(
-        commit_behavior(payload).get(
-            "files_changed",
-            0,
+        len(
+            artifact_files(
+                observation
+            )
         )
-        or 0
     )
 
 
@@ -134,5 +96,3 @@ def entropy(
         )
 
     return result
-
-

@@ -1,8 +1,7 @@
 from math import log1p
 
-from app.domain.event import Event
-
-from app.measurement.domain.catalog import DefaultMeasurementCatalog
+from app.measurement.core.ids import stable_measurement_id
+from app.measurement.core.interfaces import MeasurementEvaluator
 from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementContext
 from app.measurement.domain import MeasurementDefinition
@@ -10,45 +9,38 @@ from app.measurement.domain import MeasurementMethod
 from app.measurement.domain import MeasurementProvenance
 from app.measurement.domain import MeasurementTrace
 from app.measurement.domain import MeasurementUncertainty
-from app.measurement.domain import MeasurementUnit
 from app.measurement.domain import NormalizationMethod
-from app.measurement.core.ids import stable_measurement_id
-from app.measurement.core.interfaces import MeasurementEvaluator
+from app.measurement.domain.catalog import DefaultMeasurementCatalog
 from app.measurement.evaluators.common import additions
 from app.measurement.evaluators.common import artifact_files
 from app.measurement.evaluators.common import deletions
 from app.measurement.evaluators.common import files_changed
 from app.measurement.evaluators.common import total_changes
+from app.observation.domain import Observation
 
 
 class ChangeImpactEvaluator(MeasurementEvaluator):
 
     _REGISTRY = DefaultMeasurementCatalog.build()
 
-    CHANGE_SURFACE_AREA = _REGISTRY.get(
-        "change_surface_area"
-    )
-
-    REVIEW_ATTENTION_NEED = _REGISTRY.get(
-        "review_attention_need"
-    )
+    CHANGE_SURFACE_AREA = _REGISTRY.get("change_surface_area")
+    REVIEW_ATTENTION_NEED = _REGISTRY.get("review_attention_need")
 
     def evaluate(
         self,
-        event: Event,
+        observation: Observation,
         context: MeasurementContext,
     ) -> list[Measurement]:
-        payload = event.payload
         files = artifact_files(
-            payload
+            observation
         )
 
         churn = total_changes(
-            payload
+            observation
         )
 
         file_count = files_changed(
-            payload
+            observation
         )
 
         surface_area = min(
@@ -69,14 +61,14 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
         deletion_ratio = 0.0
 
         line_total = additions(
-            payload
+            observation
         ) + deletions(
-            payload
+            observation
         )
 
         if line_total > 0:
             deletion_ratio = deletions(
-                payload
+                observation
             ) / line_total
 
         patch_coverage = self._patch_coverage(
@@ -95,7 +87,7 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
             self._measurement(
                 self.CHANGE_SURFACE_AREA,
                 surface_area,
-                event,
+                observation,
                 context,
                 {
                     "coverage": 1.0 if churn > 0 else 0.4,
@@ -104,7 +96,7 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
             self._measurement(
                 self.REVIEW_ATTENTION_NEED,
                 attention,
-                event,
+                observation,
                 context,
                 {
                     "coverage": max(
@@ -123,24 +115,10 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
         self,
         definition: MeasurementDefinition,
         value: float,
-        event: Event,
+        observation: Observation,
         context: MeasurementContext,
         metadata,
     ) -> Measurement:
-        source = str(
-            event.metadata.get(
-                "source",
-                "unknown",
-            )
-        )
-
-        adapter = str(
-            event.metadata.get(
-                "gateway",
-                "unknown",
-            )
-        )
-
         method = MeasurementMethod(
             name="change_impact_evaluator",
             version="1.0",
@@ -149,7 +127,7 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
 
         return Measurement(
             id=stable_measurement_id(
-                event.id,
+                observation.observation_id,
                 definition.id,
                 definition.version,
             ),
@@ -171,17 +149,16 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
                 target_unit=definition.unit,
             ),
             provenance=MeasurementProvenance(
-                source_system=source,
-                adapter=adapter,
-                source_event_id=str(
-                    event.id
-                ),
+                source_system=observation.source_platform,
+                adapter=observation.source_adapter,
+                source_event_id=observation.observation_id,
+                source_observation_id=observation.observation_id,
                 source_entity_ids=tuple(
                     target.id
-                    for target in event.target_refs
+                    for target in observation.targets
                 ),
                 transformations=(
-                    "event.payload.observation",
+                    "observation.facts",
                     method.name,
                 ),
                 tenant_id=context.tenant_id,
@@ -205,14 +182,9 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
         files_with_patch = sum(
             1
             for file in files
-            if file.get(
-                "patch",
-            )
+            if file.patch
         )
 
         return files_with_patch / len(
             files
         )
-
-
-

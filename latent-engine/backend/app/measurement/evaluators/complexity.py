@@ -1,6 +1,5 @@
-from app.domain.event import Event
-
-from app.measurement.domain.catalog import DefaultMeasurementCatalog
+from app.measurement.core.ids import stable_measurement_id
+from app.measurement.core.interfaces import MeasurementEvaluator
 from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementContext
 from app.measurement.domain import MeasurementDefinition
@@ -8,15 +7,14 @@ from app.measurement.domain import MeasurementMethod
 from app.measurement.domain import MeasurementProvenance
 from app.measurement.domain import MeasurementTrace
 from app.measurement.domain import MeasurementUncertainty
-from app.measurement.domain import MeasurementUnit
 from app.measurement.domain import NormalizationMethod
-from app.measurement.core.ids import stable_measurement_id
-from app.measurement.core.interfaces import MeasurementEvaluator
+from app.measurement.domain.catalog import DefaultMeasurementCatalog
 from app.measurement.evaluators.common import additions
 from app.measurement.evaluators.common import artifact_files
 from app.measurement.evaluators.common import deletions
 from app.measurement.evaluators.common import entropy
 from app.measurement.evaluators.common import files_changed
+from app.observation.domain import Observation
 
 
 class ChangeComplexityEvaluator(MeasurementEvaluator):
@@ -24,13 +22,8 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
     _REGISTRY = DefaultMeasurementCatalog.build()
 
     CODE_CHURN = _REGISTRY.get("code_churn")
-
     FILES_CHANGED = _REGISTRY.get("files_changed")
-
-    PATCH_COMPLEXITY_DELTA = _REGISTRY.get(
-        "patch_complexity_delta"
-    )
-
+    PATCH_COMPLEXITY_DELTA = _REGISTRY.get("patch_complexity_delta")
     CHANGE_DISTRIBUTION_ENTROPY = _REGISTRY.get(
         "change_distribution_entropy"
     )
@@ -49,22 +42,21 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
 
     def evaluate(
         self,
-        event: Event,
+        observation: Observation,
         context: MeasurementContext,
     ) -> list[Measurement]:
-        payload = event.payload
         files = artifact_files(
-            payload
+            observation
         )
 
         churn = additions(
-            payload
+            observation
         ) + deletions(
-            payload
+            observation
         )
 
         file_count = files_changed(
-            payload
+            observation
         )
 
         complexity_delta = self._patch_complexity_delta(
@@ -74,11 +66,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
         distribution_entropy = entropy(
             [
                 float(
-                    file.get(
-                        "changes",
-                        0,
-                    )
-                    or 0
+                    file.changes
                 )
                 for file in files
             ]
@@ -88,7 +76,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
             self._measurement(
                 self.CODE_CHURN,
                 churn,
-                event,
+                observation,
                 context,
                 {
                     "coverage": 1.0,
@@ -97,7 +85,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
             self._measurement(
                 self.FILES_CHANGED,
                 file_count,
-                event,
+                observation,
                 context,
                 {
                     "coverage": 1.0 if file_count > 0 else 0.5,
@@ -106,7 +94,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
             self._measurement(
                 self.PATCH_COMPLEXITY_DELTA,
                 complexity_delta,
-                event,
+                observation,
                 context,
                 {
                     "coverage": self._patch_coverage(
@@ -117,7 +105,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
             self._measurement(
                 self.CHANGE_DISTRIBUTION_ENTROPY,
                 distribution_entropy,
-                event,
+                observation,
                 context,
                 {
                     "coverage": 1.0 if files else 0.4,
@@ -129,24 +117,10 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
         self,
         definition: MeasurementDefinition,
         value: float,
-        event: Event,
+        observation: Observation,
         context: MeasurementContext,
         metadata,
     ) -> Measurement:
-        source = str(
-            event.metadata.get(
-                "source",
-                "unknown",
-            )
-        )
-
-        adapter = str(
-            event.metadata.get(
-                "gateway",
-                "unknown",
-            )
-        )
-
         method = MeasurementMethod(
             name="change_complexity_evaluator",
             version="1.0",
@@ -155,7 +129,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
 
         return Measurement(
             id=stable_measurement_id(
-                event.id,
+                observation.observation_id,
                 definition.id,
                 definition.version,
             ),
@@ -177,17 +151,16 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
                 target_unit=definition.unit,
             ),
             provenance=MeasurementProvenance(
-                source_system=source,
-                adapter=adapter,
-                source_event_id=str(
-                    event.id
-                ),
+                source_system=observation.source_platform,
+                adapter=observation.source_adapter,
+                source_event_id=observation.observation_id,
+                source_observation_id=observation.observation_id,
                 source_entity_ids=tuple(
                     target.id
-                    for target in event.target_refs
+                    for target in observation.targets
                 ),
                 transformations=(
-                    "event.payload.observation",
+                    "observation.facts",
                     method.name,
                 ),
                 tenant_id=context.tenant_id,
@@ -208,15 +181,11 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
         score = 0.0
 
         for file in files:
-            patch = file.get(
-                "patch",
-            )
-
-            if not patch:
+            if not file.patch:
                 continue
 
             for line in str(
-                patch
+                file.patch
             ).splitlines():
                 if line.startswith(
                     "+++"
@@ -239,9 +208,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
                 if sign == 0.0:
                     continue
 
-                normalized = (
-                    f" {line[1:].lower()} "
-                )
+                normalized = f" {line[1:].lower()} "
 
                 score += sign * sum(
                     1
@@ -261,14 +228,9 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
         files_with_patch = sum(
             1
             for file in files
-            if file.get(
-                "patch",
-            )
+            if file.patch
         )
 
         return files_with_patch / len(
             files
         )
-
-
-

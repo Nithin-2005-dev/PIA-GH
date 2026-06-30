@@ -140,6 +140,7 @@ class MeasurementProvenance:
     source_system: str
     adapter: str
     source_event_id: str | None = None
+    source_observation_id: str | None = None
     source_signal_ids: tuple[str, ...] = ()
     source_entity_ids: tuple[str, ...] = ()
     transformations: tuple[str, ...] = ()

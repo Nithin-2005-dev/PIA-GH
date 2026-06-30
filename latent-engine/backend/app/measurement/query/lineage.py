@@ -30,9 +30,10 @@ class MeasurementLineageService:
         self,
         measurement: Measurement,
     ) -> MeasurementLineageGraph:
-        event_id = (
-            measurement.provenance.source_event_id
-            or "unknown-event"
+        observation_id = (
+            measurement.provenance.source_observation_id
+            or measurement.provenance.source_event_id
+            or "unknown-observation"
         )
         adapter_id = (
             f"adapter:{measurement.provenance.source_system}:"
@@ -45,9 +46,9 @@ class MeasurementLineageService:
 
         nodes = [
             LineageNode(
-                id=event_id,
-                kind="event",
-                label="Source Event",
+                id=observation_id,
+                kind="observation",
+                label="Source Observation",
                 metadata={},
             ),
             LineageNode(
@@ -81,7 +82,7 @@ class MeasurementLineageService:
 
         edges = [
             LineageEdge(
-                source_id=event_id,
+                source_id=observation_id,
                 target_id=adapter_id,
                 relationship="observed_by",
             ),
