@@ -140,10 +140,14 @@ class MeasurementProvenance:
     source_system: str
     adapter: str
     source_event_id: str | None = None
+    source_observation_id: str | None = None
     source_signal_ids: tuple[str, ...] = ()
     source_entity_ids: tuple[str, ...] = ()
     transformations: tuple[str, ...] = ()
     tenant_id: str | None = None
+    target_entity: str | None = None
+    target_entity_type: str | None = None
+    measurement_scope: str | None = None
     raw_refs: Mapping[str, Any] = field(default_factory=dict)
 
 

@@ -6,6 +6,9 @@
 Software Events
     |
     v
+Vendor Adapter
+    |
+    v
 Observation Layer
     |
     v
@@ -27,22 +30,25 @@ Decision Layer
 Short form:
 
 ```text
-Event -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
+Observation -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
 ```
 
 ## Contract Rule
 
-Evidence is the exclusive bridge from Measurement to Expertise.
+Observation preserves software reality. Measurement quantifies it. Evidence
+synthesizes measurement output into trustworthy conclusions.
 
-- Measurement produces validated, confidence-scored, unit-aware facts.
-- Evidence synthesizes validated measurements into explainable conclusions.
-- Expertise consumes evidence only, never raw measurements.
+- Observation produces immutable vendor-neutral `Observation` objects.
+- Measurement consumes only canonical observations and produces validated,
+  confidence-scored, unit-aware measurements.
+- Evidence consumes only validated measurements.
+- Expertise consumes evidence only, never raw observations or measurements.
 
 ## Current Capability Graph
 
 ```text
 Activity
-  -> Observation
+  -> Canonical Observation
   -> Measurement
   -> Evidence
   -> Expertise
@@ -56,13 +62,15 @@ Activity
 
 ### Observation Layer
 
-Captures source-system activity as immutable events and software signals.
+Adapters authenticate, fetch, parse, translate, and preserve provenance.
+Observation stores immutable canonical facts. It never calculates measurement,
+confidence, risk, evidence, or business meaning.
 
 ### Measurement Operating System
 
 Computes deterministic measurements, performs normalization, validation,
 confidence estimation, uncertainty modeling, quality scoring, benchmarking,
-lineage, streaming, and replay support.
+lineage, streaming, and replay support from `Observation` input only.
 
 ### Evidence Intelligence Platform
 
@@ -73,8 +81,8 @@ context, historical context, and explanations.
 
 ### Expertise Layer
 
-Applies domain expertise to validated evidence. Direct measurement access is
-outside the layer contract.
+Applies domain expertise to validated evidence. Direct measurement and
+observation access is outside the layer contract.
 
 ### Reasoning Layer
 
@@ -89,8 +97,8 @@ Turns reasoning into recommendations, plans, and executive actions.
 M1-M9 established events, legacy evidence extraction, expertise, ownership,
 and risk.
 
-M30-M34 established the Measurement Operating System, signal intelligence, and
-scientific validation.
+M30-M35 established the Measurement Operating System, signal intelligence,
+scientific validation, and the Evidence Intelligence Platform.
 
-M35 establishes the Evidence Intelligence Platform as the production bridge
-between Measurement and Expertise.
+M36 refactors Observation into the canonical vendor-agnostic foundation beneath
+Measurement.

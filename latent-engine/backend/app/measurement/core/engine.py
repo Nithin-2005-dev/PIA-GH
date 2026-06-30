@@ -1,14 +1,15 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from app.domain.event import Event
-
 from app.measurement.core.confidence import DefaultConfidenceEstimator
 from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementContext
 from app.measurement.domain import ValidationStatus
 from app.measurement.evaluators.complexity import ChangeComplexityEvaluator
 from app.measurement.evaluators.impact import ChangeImpactEvaluator
+from app.measurement.evaluators.developer_activity import DeveloperActivityEvaluator
+from app.measurement.evaluators.file_activity import FileActivityEvaluator
+from app.measurement.evaluators.subsystem_activity import SubsystemActivityEvaluator
 from app.measurement.core.interfaces import ConfidenceEstimator
 from app.measurement.core.interfaces import MeasurementEvaluator
 from app.measurement.core.interfaces import MeasurementNormalizer
@@ -23,13 +24,15 @@ from app.measurement.core.validation import FiniteValueValidator
 from app.measurement.core.validation import RangeValidator
 from app.measurement.core.validation import UnitValidator
 from app.measurement.core.validation import merge_validation_results
+from app.observation.domain import Observation
+from app.observation.integration.event_compat import event_to_observation
 
 
 class MeasurementEngine:
     """
     Deterministic measurement pipeline.
 
-    The engine consumes immutable events containing observations and
+    The engine consumes immutable canonical observations and
     produces immutable, normalized, validated measurements.
     """
 
@@ -60,6 +63,9 @@ class MeasurementEngine:
             evaluators=[
                 ChangeComplexityEvaluator(),
                 ChangeImpactEvaluator(),
+                DeveloperActivityEvaluator(),
+                FileActivityEvaluator(),
+                SubsystemActivityEvaluator(),
             ],
             normalizers=[
                 UnitConversionNormalizer(),
@@ -76,9 +82,9 @@ class MeasurementEngine:
             normalization_pipeline=NormalizationPipeline.default(),
         )
 
-    def measure_event(
+    def measure_observation(
         self,
-        event: Event,
+        observation: Observation,
         context: MeasurementContext | None = None,
     ) -> list[Measurement]:
         if context is None:
@@ -92,7 +98,7 @@ class MeasurementEngine:
 
         for evaluator in self._evaluators:
             for measurement in evaluator.evaluate(
-                event,
+                observation,
                 context,
             ):
                 measurements.append(
@@ -104,22 +110,51 @@ class MeasurementEngine:
 
         return measurements
 
-    def measure_events(
+    def measure_observations(
         self,
-        events: list[Event],
+        observations: list[Observation],
         context: MeasurementContext | None = None,
     ) -> list[Measurement]:
         measurements = []
 
-        for event in events:
+        for observation in observations:
             measurements.extend(
-                self.measure_event(
-                    event,
+                self.measure_observation(
+                    observation,
                     context,
                 )
             )
 
         return measurements
+
+    def measure_event(
+        self,
+        event,
+        context: MeasurementContext | None = None,
+    ) -> list[Measurement]:
+        """
+        Deprecated compatibility bridge.
+
+        Measurement's canonical contract is `Observation`. Legacy callers that
+        still hold `app.domain.event.Event` are translated before evaluation.
+        """
+        return self.measure_observation(
+            event_to_observation(event),
+            context,
+        )
+
+    def measure_events(
+        self,
+        events: list,
+        context: MeasurementContext | None = None,
+    ) -> list[Measurement]:
+        return self.measure_observations(
+            [
+                event_to_observation(event)
+                for event in events
+            ],
+            context,
+        )
 
     def _finalize(
         self,

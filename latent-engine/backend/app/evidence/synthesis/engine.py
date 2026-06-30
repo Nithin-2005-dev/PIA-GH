@@ -69,41 +69,44 @@ class EvidenceSynthesisEngine:
             }
         ]
 
-        measurement_refs = {
-            measurement.definition.id: (
-                EvidenceMeasurementRef.from_measurement(
-                    measurement
-                )
+        # Fact Extraction: Group by target_entity
+        from collections import defaultdict
+        measurements_by_entity = defaultdict(dict)
+        
+        for measurement in valid_measurements:
+            target_entity = measurement.provenance.target_entity or "global"
+            target_entity_type = measurement.provenance.target_entity_type or "unknown"
+            
+            # Store tuple of (target_entity, target_entity_type)
+            measurements_by_entity[(target_entity, target_entity_type)][measurement.definition.id] = (
+                EvidenceMeasurementRef.from_measurement(measurement)
             )
-            for measurement in valid_measurements
-        }
 
         evidence_items = []
-        rejected_count = len(
-            measurements
-        ) - len(
-            valid_measurements
-        )
+        rejected_count = len(measurements) - len(valid_measurements)
 
-        for definition in self._knowledge_base.all():
-            candidate = self._synthesize_definition(
-                definition,
-                measurement_refs,
-                context,
-            )
-
-            if candidate is None:
-                continue
-
-            validated = self._validation_pipeline.validate(
-                candidate
-            )
-            if validated.is_valid_for_expertise():
-                evidence_items.append(
-                    validated
+        for (target_entity, target_entity_type), entity_measurements in measurements_by_entity.items():
+            for definition in self._knowledge_base.all():
+                candidate = self._synthesize_definition(
+                    definition,
+                    entity_measurements,
+                    context,
+                    target_entity,
+                    target_entity_type,
                 )
-            else:
-                rejected_count += 1
+
+                if candidate is None:
+                    continue
+
+                validated = self._validation_pipeline.validate(
+                    candidate
+                )
+                if validated.is_valid_for_expertise():
+                    evidence_items.append(
+                        validated
+                    )
+                else:
+                    rejected_count += 1
 
         return EvidencePackage(
             tenant_id=context.tenant_id,
@@ -115,6 +118,7 @@ class EvidenceSynthesisEngine:
             rejected_count=rejected_count,
             audit_events=(
                 "measurement_intake_validated",
+                "evidence_facts_extracted",
                 "evidence_rules_evaluated",
                 "evidence_validation_completed",
             ),
@@ -133,6 +137,8 @@ class EvidenceSynthesisEngine:
         definition: EvidenceDefinition,
         measurements_by_definition: dict[str, EvidenceMeasurementRef],
         context: EvidenceContext,
+        target_entity: str,
+        target_entity_type: str,
     ) -> Evidence | None:
         required_present = all(
             measurement_id in measurements_by_definition
@@ -284,6 +290,8 @@ class EvidenceSynthesisEngine:
             version=definition.version_history[-1],
             lifecycle=definition.lifecycle,
             metadata={
+                "target_entity": target_entity,
+                "target_entity_type": target_entity_type,
                 "semantic_meaning": definition.semantic_meaning,
                 "required_measurements": (
                     definition.required_measurements

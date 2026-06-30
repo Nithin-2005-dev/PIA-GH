@@ -1,27 +1,36 @@
 from abc import ABC, abstractmethod
 
-from app.domain.event import Event
+from app.observation.domain import Observation
 
 from .event_query import EventQuery
 
 
-class EventSourcePort(ABC):
+class ObservationSourcePort(ABC):
     """
-    Contract for external event sources.
+    Contract for external observation sources.
 
-    Implementations translate external systems into
-    normalized domain Events.
+    Implementations translate external systems into canonical immutable
+    Observations. Vendor payloads must not leak through this port.
     """
 
     @abstractmethod
     def collect(
         self,
         query: EventQuery,
-    ) -> list[Event]:
+    ) -> list[Observation]:
         """
-        Collect events satisfying the given query.
+        Collect observations satisfying the given query.
 
         Returns:
-            A list of normalized immutable domain Events.
+            A list of canonical immutable Observations.
         """
         raise NotImplementedError
+
+
+class EventSourcePort(ObservationSourcePort):
+    """
+    Deprecated compatibility alias.
+
+    New adapters should implement ObservationSourcePort and return
+    `app.observation.domain.Observation`.
+    """

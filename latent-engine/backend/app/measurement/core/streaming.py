@@ -1,17 +1,23 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from app.domain.event import Event
-
+from app.measurement.core.engine import MeasurementEngine
 from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementContext
-from app.measurement.core.engine import MeasurementEngine
+from app.observation.domain import Observation
+from app.observation.integration import event_to_observation
 
 
 @dataclass(frozen=True)
 class MeasurementUpdate:
-    event_id: str
+    observation_id: str
     measurements: tuple[Measurement, ...]
+
+    @property
+    def event_id(
+        self,
+    ) -> str:
+        return self.observation_id
 
 
 class StreamingMeasurementEngine:
@@ -35,20 +41,26 @@ class StreamingMeasurementEngine:
 
     def ingest(
         self,
-        event: Event,
+        observation: Observation,
         context: MeasurementContext,
     ) -> MeasurementUpdate:
+        if not isinstance(
+            observation,
+            Observation,
+        ):
+            observation = event_to_observation(
+                observation
+            )
+
         measurements = tuple(
-            self._engine.measure_event(
-                event,
+            self._engine.measure_observation(
+                observation,
                 context,
             )
         )
 
         update = MeasurementUpdate(
-            event_id=str(
-                event.id
-            ),
+            observation_id=observation.observation_id,
             measurements=measurements,
         )
 
@@ -59,4 +71,14 @@ class StreamingMeasurementEngine:
 
         return update
 
-
+    def ingest_event(
+        self,
+        event,
+        context: MeasurementContext,
+    ) -> MeasurementUpdate:
+        return self.ingest(
+            event_to_observation(
+                event
+            ),
+            context,
+        )

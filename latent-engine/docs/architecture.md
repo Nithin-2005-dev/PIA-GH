@@ -8,6 +8,9 @@ The platform architecture is now:
 Software Events
     |
     v
+Vendor Adapter
+    |
+    v
 Observation Layer
     |
     v
@@ -29,27 +32,30 @@ Decision Layer
 Conceptually:
 
 ```text
-Event -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
+Observation -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
 ```
 
 ## Layer Responsibilities
 
-- Events capture reality.
-- Observations preserve source-system facts in normalized software signals.
-- Measurements quantify reality with deterministic, validated, unit-aware
+- Vendor adapters fetch platform data and translate it into observations.
+- Observation preserves immutable, vendor-neutral canonical facts.
+- Measurement quantifies reality with deterministic, validated, unit-aware
   values.
 - Evidence synthesizes and validates conclusions from measurements.
 - Expertise applies domain knowledge and best practices to evidence.
 - Reasoning combines expert knowledge into coherent analyses.
 - Decisions recommend actions based on reasoning.
 
+Observation does not calculate measurements, infer evidence, estimate
+confidence, assign risk, normalize business meaning, or reason.
+
 ## Evidence Boundary
 
 The Evidence Intelligence Platform is the exclusive bridge between the
 Measurement Operating System and the Expertise Layer.
 
-The Expertise Layer must never directly consume measurements. It receives only
-validated `Evidence` objects from an `EvidencePackage`.
+The Expertise Layer must never directly consume observations or measurements.
+It receives only validated `Evidence` objects from an `EvidencePackage`.
 
 The Evidence layer must never calculate measurements. It consumes only
 Measurement Layer outputs that have passed validation or warning gates, then
@@ -60,6 +66,7 @@ discovers, validates, correlates, ranks, and explains evidence.
 ```mermaid
 sequenceDiagram
   participant Event as Software Event
+  participant Adapter as Vendor Adapter
   participant Observation as Observation Layer
   participant Measurement as Measurement Operating System
   participant Evidence as Evidence Intelligence Platform
@@ -67,9 +74,11 @@ sequenceDiagram
   participant Reasoning as Reasoning Layer
   participant Decision as Decision Layer
 
-  Event->>Observation: capture source reality
-  Observation->>Measurement: normalized software signals
-  Measurement->>Measurement: validate, normalize, score confidence
+  Event->>Adapter: vendor payload
+  Adapter->>Observation: canonical observation
+  Observation->>Observation: validate and append
+  Observation->>Measurement: Observation
+  Measurement->>Measurement: quantify, validate, score confidence
   Measurement->>Evidence: validated measurements only
   Evidence->>Evidence: synthesize, correlate, validate, rank
   Evidence->>Expertise: EvidencePackage.for_expertise()
@@ -81,6 +90,9 @@ sequenceDiagram
 ## Package Map
 
 ```text
+backend/app/observation
+  canonical observation platform, registry, ontology, validation and store
+
 backend/app/measurement
   deterministic measurement operating system
 
@@ -99,7 +111,7 @@ backend/app/decision, backend/app/executive
 
 ## Backward Compatibility
 
-Earlier milestones used `domain.Evidence` for event-derived interpretation.
-That object remains for legacy flows. M35 introduces
-`app.evidence.domain.Evidence` as the production evidence object used between
-Measurement and Expertise.
+Earlier milestones used `domain.Event` as the primary source abstraction. That
+object remains for legacy flows only. M36 introduces
+`app.observation.domain.Observation` as the production object consumed by the
+Measurement Operating System.

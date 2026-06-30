@@ -2,20 +2,20 @@
 
 ## Purpose
 
-The Measurement Layer is the deterministic processing stage between adapters
-and evidence.
+The Measurement Layer is the deterministic processing stage between canonical
+observations and evidence.
 
 ```text
 Adapters
-  -> Raw Software Signals / Observation Events
+  -> Canonical Observation
   -> Measurement Layer
   -> Evidence Intelligence Platform
   -> Expertise Layer
   -> Reasoning Layer
 ```
 
-Adapters preserve what happened. Measurements compute reproducible quantities
-from those observations. Evidence interprets those quantities.
+Observation preserves what happened. Measurements compute reproducible
+quantities from those observations. Evidence interprets those quantities.
 
 ## Design Rules
 
@@ -62,7 +62,7 @@ app/measurement
   mql.py             query language for measurement consumers
   packs.py           metric packs and marketplace installation
   semantic_graph.py  graph relationships between measurement concepts
-  streaming.py       event-driven measurement updates
+  streaming.py       observation-driven measurement updates
   signals.py         universal signal registry
   signal_ontology.py semantic signal ontology
   signal_classifier.py
@@ -169,7 +169,7 @@ measurement uncertainty practice.
 ## Pipeline
 
 ```text
-Event
+Observation
   -> MeasurementEvaluator
   -> NormalizationPipeline
        -> Cleaning
@@ -213,7 +213,7 @@ Default evaluators currently compute:
 ```mermaid
 sequenceDiagram
   participant Adapter
-  participant Event
+  participant Observation
   participant Engine as MeasurementEngine
   participant Eval as Evaluator
   participant Norm as Normalizer
@@ -221,9 +221,9 @@ sequenceDiagram
   participant Conf as ConfidenceEstimator
   participant Qual as QualityScorer
 
-  Adapter->>Event: normalized observation payload
-  Event->>Engine: measure_event(event, context)
-  Engine->>Eval: evaluate(event, context)
+  Adapter->>Observation: canonical facts + provenance
+  Observation->>Engine: measure_observation(observation, context)
+  Engine->>Eval: evaluate(observation, context)
   Eval-->>Engine: raw measurements
   Engine->>Norm: normalize(measurement)
   Engine->>Val: validate(measurement)
@@ -328,7 +328,7 @@ Quality combines:
 
 ## Lineage And Explainability
 
-`MeasurementLineageService` builds a DAG from source event to adapter,
+`MeasurementLineageService` builds a DAG from source observation to adapter,
 definition, measurement and derived dependencies.
 
 `MeasurementLineageQueryEngine` supports path and dependent queries over that
@@ -387,8 +387,8 @@ ORDER BY quality_score
 
 ## Streaming, Active Measurement And Packs
 
-`StreamingMeasurementEngine` accepts events and publishes measurement updates to
-subscribers for event-driven recomputation.
+`StreamingMeasurementEngine` accepts observations and publishes measurement
+updates to subscribers for observation-driven recomputation.
 
 `ActiveMeasurementService` requests additional adapter observations when
 confidence is low.
@@ -421,8 +421,8 @@ and metadata lineage.
 
 The layer is designed for:
 
-- batch execution with `measure_events`
-- streaming execution with per-event `measure_event`
+- batch execution with `measure_observations`
+- streaming execution with per-observation `measure_observation`
 - tenant isolation through `MeasurementContext.tenant_id`
 - versioned algorithms and definitions
 - auditability through provenance and traceability
@@ -502,7 +502,7 @@ Future test layers:
 
 - unit tests for each evaluator, normalizer and validator
 - property tests for deterministic IDs and range guarantees
-- integration tests against captured GitHub observations
+- integration tests against captured canonical observations
 - regression fixtures for tool normalization differences
 - benchmark tests for high-volume event batches
 
@@ -513,7 +513,7 @@ Initial benchmark dimensions:
 - events per second
 - measurements per second
 - p50, p95 and p99 latency per evaluator
-- memory per 10k events
+- memory per 10k observations
 - recomputation rate when only one source changes
 - fusion cost by source count
 

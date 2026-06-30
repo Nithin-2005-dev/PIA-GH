@@ -38,24 +38,20 @@ class DefaultMeasurementCatalog:
         )
 
         return [
+            # ---------------------------------------------------------
+            # Commit-level (Existing + Enhancements)
+            # ---------------------------------------------------------
             MeasurementDefinition(
                 id="code_churn",
                 name="Code Churn",
-                description=(
-                    "Total added and deleted lines in the observed change."
-                ),
+                description="Total added and deleted lines in the observed change.",
                 unit=MeasurementUnit.LOC,
                 version="1.0",
                 minimum=0.0,
-                concept_id="change_impact",
-                category="behavioral",
-                expected_range=ExpectedRange(
-                    minimum=0.0,
-                ),
-                required_signals=(
-                    "total_additions",
-                    "total_deletions",
-                ),
+                concept_id="churn",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("total_additions", "total_deletions"),
                 normalizer="identity",
                 aggregation_strategy="sum",
                 references=standards,
@@ -64,17 +60,13 @@ class DefaultMeasurementCatalog:
             MeasurementDefinition(
                 id="files_changed",
                 name="Files Changed",
-                description=(
-                    "Number of artifacts touched by the observed change."
-                ),
+                description="Number of artifacts touched by the observed change.",
                 unit=MeasurementUnit.COUNT,
                 version="1.0",
                 minimum=0.0,
                 concept_id="change_impact",
                 category="behavioral",
-                expected_range=ExpectedRange(
-                    minimum=0.0,
-                ),
+                expected_range=ExpectedRange(minimum=0.0),
                 required_signals=("files",),
                 normalizer="identity",
                 aggregation_strategy="sum",
@@ -84,10 +76,7 @@ class DefaultMeasurementCatalog:
             MeasurementDefinition(
                 id="patch_complexity_delta",
                 name="Patch Complexity Delta",
-                description=(
-                    "Deterministic approximation of control-flow "
-                    "complexity introduced by changed patch lines."
-                ),
+                description="Deterministic approximation of control-flow complexity introduced.",
                 unit=MeasurementUnit.COMPLEXITY,
                 version="1.0",
                 concept_id="complexity",
@@ -101,17 +90,13 @@ class DefaultMeasurementCatalog:
             MeasurementDefinition(
                 id="change_distribution_entropy",
                 name="Change Distribution Entropy",
-                description=(
-                    "Entropy of line changes across touched files."
-                ),
+                description="Entropy of line changes across touched files.",
                 unit=MeasurementUnit.ENTROPY,
                 version="1.0",
                 minimum=0.0,
                 concept_id="information_distribution",
-                category="information_theory",
-                expected_range=ExpectedRange(
-                    minimum=0.0,
-                ),
+                category="knowledge",
+                expected_range=ExpectedRange(minimum=0.0),
                 required_signals=("file_changes",),
                 normalizer="identity",
                 aggregation_strategy="mean",
@@ -121,24 +106,15 @@ class DefaultMeasurementCatalog:
             MeasurementDefinition(
                 id="change_surface_area",
                 name="Change Surface Area",
-                description=(
-                    "Deterministic size-and-spread score for the "
-                    "observed change."
-                ),
+                description="Deterministic size-and-spread score for the observed change.",
                 unit=MeasurementUnit.SCORE,
                 version="1.0",
                 minimum=0.0,
                 maximum=100.0,
                 concept_id="change_impact",
-                category="impact",
-                expected_range=ExpectedRange(
-                    minimum=0.0,
-                    maximum=100.0,
-                ),
-                required_signals=(
-                    "total_changes",
-                    "files_changed",
-                ),
+                category="structural",
+                expected_range=ExpectedRange(minimum=0.0, maximum=100.0),
+                required_signals=("total_changes", "files_changed"),
                 normalizer="bounded_score_clamp",
                 aggregation_strategy="weighted_mean",
                 references=standards,
@@ -147,37 +123,223 @@ class DefaultMeasurementCatalog:
             MeasurementDefinition(
                 id="review_attention_need",
                 name="Review Attention Need",
-                description=(
-                    "Normalized review attention score derived from "
-                    "churn, spread, deletions and patch availability."
-                ),
+                description="Normalized review attention score derived from churn and spread.",
                 unit=MeasurementUnit.SCORE,
                 version="1.0",
                 minimum=0.0,
                 maximum=100.0,
                 concept_id="change_impact",
                 category="review",
-                expected_range=ExpectedRange(
-                    minimum=0.0,
-                    maximum=100.0,
-                ),
-                formula=(
-                    "surface_area * 0.65 + deletion_ratio * 20 + "
-                    "missing_patch_ratio * 15"
-                ),
-                dependencies=(
-                    "change_surface_area",
-                ),
-                required_signals=(
-                    "total_changes",
-                    "files_changed",
-                    "patch",
-                ),
+                expected_range=ExpectedRange(minimum=0.0, maximum=100.0),
+                required_signals=("total_changes", "files_changed", "patch"),
                 normalizer="bounded_score_clamp",
                 aggregation_strategy="weighted_mean",
                 references=standards,
                 tags=("impact", "review"),
             ),
+            MeasurementDefinition(
+                id="commit_message_length",
+                name="Commit Message Length",
+                description="Length of the commit message as a proxy for documentation quality.",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="structural",
+                category="documentation",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("message",),
+                normalizer="identity",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("documentation", "quality"),
+            ),
+
+            # ---------------------------------------------------------
+            # Per-Author Activity (Developer entity)
+            # ---------------------------------------------------------
+            MeasurementDefinition(
+                id="author_contribution_count",
+                name="Author Contribution Count",
+                description="Number of commits authored.",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="activity_frequency",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("author_name",),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("developer", "activity"),
+            ),
+            MeasurementDefinition(
+                id="author_file_touch_count",
+                name="Author File Touch Count",
+                description="Distinct files touched by this author.",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="activity_frequency",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("author_name", "files"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("developer", "spread"),
+            ),
+            MeasurementDefinition(
+                id="author_code_churn",
+                name="Author Code Churn",
+                description="Total LOC changed by author.",
+                unit=MeasurementUnit.LOC,
+                version="1.0",
+                minimum=0.0,
+                concept_id="churn",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("author_name", "total_changes"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("developer", "churn"),
+            ),
+
+            # ---------------------------------------------------------
+            # Per-File Activity (Module entity)
+            # ---------------------------------------------------------
+            MeasurementDefinition(
+                id="file_churn",
+                name="File Churn",
+                description="LOC changed in this file.",
+                unit=MeasurementUnit.LOC,
+                version="1.0",
+                minimum=0.0,
+                concept_id="churn",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("file_path", "changes"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("module", "churn"),
+            ),
+            MeasurementDefinition(
+                id="file_touch_count",
+                name="File Touch Count",
+                description="Times this file was touched.",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="activity_frequency",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("file_path",),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("module", "activity"),
+            ),
+            MeasurementDefinition(
+                id="file_addition_ratio",
+                name="File Addition Ratio",
+                description="Percentage of changes that are additions.",
+                unit=MeasurementUnit.PERCENT,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="churn",
+                category="structural",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("file_path", "additions", "changes"),
+                normalizer="identity",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("module", "growth"),
+            ),
+            MeasurementDefinition(
+                id="file_is_test",
+                name="File Is Test",
+                description="Boolean indicating if the file is a test file.",
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="structural",
+                category="testing",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("file_path",),
+                normalizer="identity",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("module", "testing"),
+            ),
+            MeasurementDefinition(
+                id="file_is_documentation",
+                name="File Is Documentation",
+                description="Boolean indicating if the file is documentation.",
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="structural",
+                category="documentation",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("file_path",),
+                normalizer="identity",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("module", "documentation"),
+            ),
+            MeasurementDefinition(
+                id="file_complexity_delta",
+                name="File Complexity Delta",
+                description="Control-flow complexity introduced to the file.",
+                unit=MeasurementUnit.COMPLEXITY,
+                version="1.0",
+                concept_id="complexity",
+                category="structural",
+                required_signals=("file_path", "patch"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("module", "complexity"),
+            ),
+
+            # ---------------------------------------------------------
+            # Per-Directory Activity (Subsystem entity)
+            # ---------------------------------------------------------
+            MeasurementDefinition(
+                id="directory_churn",
+                name="Directory Churn",
+                description="Total LOC changed in directory.",
+                unit=MeasurementUnit.LOC,
+                version="1.0",
+                minimum=0.0,
+                concept_id="churn",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("directory", "changes"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("subsystem", "churn"),
+            ),
+            MeasurementDefinition(
+                id="directory_file_count",
+                name="Directory File Count",
+                description="Files changed in directory.",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="activity_frequency",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("directory", "files"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("subsystem", "spread"),
+            ),
         ]
-
-
