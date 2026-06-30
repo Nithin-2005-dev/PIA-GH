@@ -1,161 +1,96 @@
-# Current PIA Architecture (M1-M9)
+# Current PIA Architecture
 
-## Flow
+## Canonical Flow
 
-GitHub
+```text
+Software Events
+    |
+    v
+Observation Layer
+    |
+    v
+Measurement Operating System
+    |
+    v
+Evidence Intelligence Platform
+    |
+    v
+Expertise Layer
+    |
+    v
+Reasoning Layer
+    |
+    v
+Decision Layer
+```
 
-↓
+Short form:
 
-Events
+```text
+Event -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
+```
 
-↓
+## Contract Rule
 
-Evidence Extraction
+Evidence is the exclusive bridge from Measurement to Expertise.
 
-↓
-
-Evidence
-
-↓
-
-Expertise Estimation
-
-↓
-
-Time-Aware Expertise
-
-↓
-
-Query Layer
-
-↓
-
-Ownership Layer
-
-↓
-
-Risk Layer
-
----
-
-## Layers
-
-### Domain Layer
-
-Core business concepts:
-
-* Event
-* Evidence
-* ExpertiseEstimate
-* OwnershipEstimate
-* BusFactor
-
----
-
-### Adapter Layer
-
-External system integration:
-
-* GitHubAdapter
-* GitHubRestGateway
-
----
-
-### Extractor Layer
-
-Transforms Events into Evidence.
-
-Policies:
-
-* GitHubCommitStrengthPolicy
-
----
-
-### Estimator Layer
-
-Transforms Evidence into Expertise.
-
-Policies:
-
-* RuleExpertiseScoringPolicy
-* ExponentialDecayPolicy
-
----
-
-### Query Layer
-
-Provides expertise retrieval and ranking.
-
-Capabilities:
-
-* Top Experts
-
----
-
-### Decision Layer
-
-Provides reviewer recommendations.
-
-Policies:
-
-* CoverageRecommendationPolicy
-
----
-
-### Ownership Layer
-
-Transforms expertise into ownership.
-
-Policies:
-
-* ExpertiseOwnershipPolicy
-
----
-
-### Risk Layer
-
-Transforms ownership into organizational risk.
-
-Policies:
-
-* OwnershipBusFactorPolicy
-
----
+- Measurement produces validated, confidence-scored, unit-aware facts.
+- Evidence synthesizes validated measurements into explainable conclusions.
+- Expertise consumes evidence only, never raw measurements.
 
 ## Current Capability Graph
 
+```text
 Activity
+  -> Observation
+  -> Measurement
+  -> Evidence
+  -> Expertise
+  -> Ownership
+  -> Risk
+  -> Forecast
+  -> Decision
+```
 
-↓
+## Layers
 
-Knowledge
+### Observation Layer
 
-↓
+Captures source-system activity as immutable events and software signals.
 
-Ownership
+### Measurement Operating System
 
-↓
+Computes deterministic measurements, performs normalization, validation,
+confidence estimation, uncertainty modeling, quality scoring, benchmarking,
+lineage, streaming, and replay support.
 
-Risk
+### Evidence Intelligence Platform
 
----
+Consumes only validated measurements. Produces immutable evidence with
+confidence, uncertainty, quality, strength, provenance, lineage,
+traceability, validation results, lifecycle, ontology category, benchmark
+context, historical context, and explanations.
+
+### Expertise Layer
+
+Applies domain expertise to validated evidence. Direct measurement access is
+outside the layer contract.
+
+### Reasoning Layer
+
+Combines expert conclusions into coherent analyses, scenarios, and forecasts.
+
+### Decision Layer
+
+Turns reasoning into recommendations, plans, and executive actions.
 
 ## Milestone Status
 
-M1 Domain Kernel
+M1-M9 established events, legacy evidence extraction, expertise, ownership,
+and risk.
 
-M2 GitHub Event Collection
+M30-M34 established the Measurement Operating System, signal intelligence, and
+scientific validation.
 
-M3 Evidence Extraction
-
-M4 Expertise Estimation
-
-M5 Query Layer
-
-M6 Reviewer Recommendation
-
-M7 Time-Aware Expertise
-
-M8 Ownership Detection
-
-M9 Bus Factor Analysis
+M35 establishes the Evidence Intelligence Platform as the production bridge
+between Measurement and Expertise.

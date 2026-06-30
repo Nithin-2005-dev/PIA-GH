@@ -1,71 +1,34 @@
-# Current PIA Architecture (M1-M10)
+# Architecture Snapshot After M10
 
-## Flow
+This is a historical snapshot. The current M35 architecture supersedes the
+direct event-to-evidence and evidence-to-expertise wording used in early
+milestones.
 
-GitHub
+Current canonical flow:
 
-↓
+```text
+Software Events
+  -> Observation Layer
+  -> Measurement Operating System
+  -> Evidence Intelligence Platform
+  -> Expertise Layer
+  -> Reasoning Layer
+  -> Decision Layer
+```
 
-Events
+M10-era capability focus:
 
-↓
-
-Evidence Extraction
-
-↓
-
-Evidence
-
-↓
-
-Expertise Estimation
-
-↓
-
-Time-Aware Expertise
-
-↓
-
-Query Layer
-
-↓
-
-Ownership Layer
-
-↓
-
-Risk Layer
-
-↓
-
-Knowledge Risk Layer
-
-↓
-
-Risk Ranking Layer
-
----
-
-## Capability Graph
-
+```text
 Activity
+  -> Knowledge
+  -> Ownership
+  -> Risk
+  -> Actionable Insights
+  -> Prioritized Risks
+```
 
-↓
+Historical note:
 
-Knowledge
-
-↓
-
-Ownership
-
-↓
-
-Risk
-
-↓
-
-Actionable Insights
-
-↓
-
-Prioritized Risks
+M1-M10 used direct evidence extraction terminology before the Measurement
+Operating System and Evidence Intelligence Platform were separated into formal
+production layers.

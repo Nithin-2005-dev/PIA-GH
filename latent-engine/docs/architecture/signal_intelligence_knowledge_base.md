@@ -12,11 +12,13 @@ Adapters
   -> Observation Layer
   -> Signal Intelligence & Knowledge Base
   -> Measurement Operating System
-  -> Evidence Layer
+  -> Evidence Intelligence Platform
+  -> Expertise Layer
 ```
 
-Evidence still receives only validated `Measurement` objects. M33 improves how
-raw software signals are registered, classified, mapped and explained.
+Evidence still receives only validated `Measurement` objects, and Expertise
+must consume evidence rather than measurements. M33 improves how raw software
+signals are registered, classified, mapped and explained.
 
 ## Package Additions
 
@@ -235,4 +237,3 @@ The script exercises:
 - measurement knowledge entries
 - benchmark datasets
 - knowledge API queries
-

@@ -9,7 +9,8 @@ and evidence.
 Adapters
   -> Raw Software Signals / Observation Events
   -> Measurement Layer
-  -> Evidence Layer
+  -> Evidence Intelligence Platform
+  -> Expertise Layer
   -> Reasoning Layer
 ```
 
@@ -182,8 +183,8 @@ Event
   -> Measurement[]
 ```
 
-Enterprise batches then pass through an accuracy gate before Evidence receives
-them:
+Enterprise batches then pass through an accuracy gate before the Evidence
+Intelligence Platform receives them:
 
 ```text
 Measurement[]
@@ -195,7 +196,7 @@ Measurement[]
   -> Probabilistic Fusion
   -> Benchmark Context
   -> Integrity Validation
-  -> Evidence Layer
+  -> Evidence Intelligence Platform
 ```
 
 Default evaluators currently compute:
@@ -433,14 +434,18 @@ The layer is designed for:
 - compressed summaries for large histories
 - future distributed execution because evaluators are stateless
 
-## Evidence Layer Contract
+## Evidence Intelligence Platform Contract
 
-The Evidence Layer must consume only `Measurement` objects that have passed the
-Measurement Layer integrity gate. It should never calculate raw metrics itself.
+The Evidence Intelligence Platform must consume only `Measurement` objects that
+have passed the Measurement Layer integrity gate. It should never calculate raw
+metrics itself.
 
 Before evidence, each measurement should be normalized, validated,
 confidence-scored, uncertainty-aware, benchmarked when a cohort exists,
 explainable, versioned, reproducible and traceable through lineage.
+
+The Expertise Layer must consume only evidence packages. It must never directly
+consume measurements.
 
 ## Signal Intelligence
 
