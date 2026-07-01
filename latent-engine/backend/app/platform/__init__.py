@@ -47,3 +47,6 @@ from app.platform.plugin import PluginRegistry
 from app.platform.runtime import BuiltPlatformRuntime
 from app.platform.runtime import PlatformRuntime
 from app.platform.scheduler import Scheduler
+from app.platform.storage import JsonlRecordStore
+from app.platform.storage import PlatformStorage
+from app.platform.storage import StorageSerializer

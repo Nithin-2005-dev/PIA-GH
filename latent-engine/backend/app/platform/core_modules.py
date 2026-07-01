@@ -27,6 +27,7 @@ class MeasurementPlatformModule(BaseModule):
         from app.measurement.scientific_engine import ScientificStatistics
         from app.measurement.scientific_engine import default_measurement_providers
         from app.measurement.scientific_engine import default_scientific_measurements
+        from app.platform.storage import PlatformStorage
 
         services.add(
             MeasurementEngine,
@@ -68,6 +69,11 @@ class MeasurementPlatformModule(BaseModule):
         services.add(
             MeasurementBenchmarkRecorder,
             MeasurementBenchmarkRecorder,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            PlatformStorage,
+            PlatformStorage,
             scope=ServiceScope.SINGLETON,
         )
 
