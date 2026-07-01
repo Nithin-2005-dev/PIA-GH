@@ -18,11 +18,12 @@ class PlatformPipeline:
     def run(
         self,
     ):
-        banner()
+        self.runtime.register_default_modules()
+        banner(self.runtime)
 
         progress = {
             "index": 0,
-            "total": 16,
+            "total": 17,
         }
 
         def show_progress(event):

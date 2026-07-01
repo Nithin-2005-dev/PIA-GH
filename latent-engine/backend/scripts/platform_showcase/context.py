@@ -9,6 +9,7 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from app.temporal.models import HistoricalContext
     from app.forecast.models import ForecastContext
+    from app.simulation.models import SimulationContext
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +219,7 @@ class PlatformContext:
     knowledge_graph: Any | None = None
     historical_context: HistoricalContext | None = None
     forecast_context: ForecastContext | None = None
+    simulation_context: SimulationContext | None = None
     org_intelligence: OrgIntelligenceResult | None = None
     reasoning_results: list[ReasoningResult] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)

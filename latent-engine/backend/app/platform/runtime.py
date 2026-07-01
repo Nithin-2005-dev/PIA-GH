@@ -114,6 +114,17 @@ class PlatformRuntime:
         finally:
             built.shutdown()
 
+    def branch(self, baseline_context: Any, scenario: Any, built_runtime: BuiltPlatformRuntime | None = None) -> Any:
+        """
+        Creates a branched execution of the canonical pipeline for a simulation scenario.
+        Delegates to CanonicalPlatformPipeline.branch().
+        """
+        from app.platform.canonical_pipeline import CanonicalPlatformPipeline
+        
+        # If not provided, we can't reliably get the currently running built_runtime from PlatformRuntime alone, 
+        # but the showcase passes it implicitly through the pipeline.
+        return CanonicalPlatformPipeline(built_runtime).branch(baseline_context, scenario)
+
 
 @dataclass
 class BuiltPlatformRuntime:

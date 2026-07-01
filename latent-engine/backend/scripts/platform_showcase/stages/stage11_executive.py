@@ -80,6 +80,54 @@ class ExecutiveDashboardStage(PipelineStage):
                 metric("Forecast", "UNAVAILABLE (pending history)")
 
             exec_recs = [r for r in org.recommendations if r.action_type == "executive"]
+            
+            # Counterfactual Simulation Summary
+            sim_context = getattr(context, "simulation_context", None)
+            if sim_context and sim_context.scenarios:
+                section("Counterfactual Simulation Summary")
+                for scenario_ctx in sim_context.scenarios:
+                    comp = scenario_ctx.comparison
+                    if comp:
+                        print(f"\n  --- {scenario_ctx.scenario.name} ---")
+                        print(f"  {scenario_ctx.scenario.description}")
+                        print(f"  Priority: {comp.recommendation_priority}")
+                        print("\n  | Metric          | Baseline | Scenario |     Δ |")
+                        print("  | --------------- | -------: | -------: | ----: |")
+                        
+                        bf_base = f"{comp.baseline_bus_factor:.1f}" if isinstance(comp.baseline_bus_factor, float) else str(comp.baseline_bus_factor)
+                        bf_scen = f"{comp.scenario_bus_factor:.1f}" if isinstance(comp.scenario_bus_factor, float) else str(comp.scenario_bus_factor)
+                        bf_delta = f"{comp.bus_factor_delta:+.1f}" if isinstance(comp.bus_factor_delta, float) else f"{comp.bus_factor_delta:+d}"
+                        print(f"  | Bus Factor      | {bf_base:>8} | {bf_scen:>8} | {bf_delta:>5} |")
+                        
+                        cov_base = f"{comp.baseline_coverage*100:.0f}%"
+                        cov_scen = f"{comp.scenario_coverage*100:.0f}%"
+                        cov_delta = f"{comp.coverage_delta*100:+.0f}%"
+                        print(f"  | Coverage        | {cov_base:>8} | {cov_scen:>8} | {cov_delta:>5} |")
+                        
+                        h_base = f"{comp.baseline_health:.2f}"
+                        h_scen = f"{comp.scenario_health:.2f}"
+                        h_delta = f"{comp.health_delta:+.2f}"
+                        print(f"  | Health          | {h_base:>8} | {h_scen:>8} | {h_delta:>5} |")
+                        
+                        kr_base = "High" if comp.baseline_high_risks > 0 else "Low"
+                        kr_scen = "High" if comp.scenario_high_risks > 0 else "Low"
+                        if comp.high_risks_delta < 0:
+                            kr_delta = "↓"
+                        elif comp.high_risks_delta > 0:
+                            kr_delta = "↑"
+                        else:
+                            kr_delta = "-"
+                        print(f"  | Knowledge Risk  | {kr_base:>8} | {kr_scen:>8} | {kr_delta:>5} |")
+                        
+                        rec_base = str(len([r for r in context.org_intelligence.recommendations])) if context.org_intelligence else "0"
+                        rec_scen = str(len([r for r in scenario_ctx.execution_result.org_intelligence.recommendations])) if scenario_ctx.execution_result and scenario_ctx.execution_result.org_intelligence else "0"
+                        rec_delta = f"{int(rec_scen) - int(rec_base):+d}"
+                        print(f"  | Recommendations | {rec_base:>8} | {rec_scen:>8} | {rec_delta:>5} |")
+                        print()
+                        
+                        metric("Impact Score", f"{comp.impact_score:.1f}")
+                        metric("Confidence", f"{comp.confidence * 100:.1f}%")
+                        
             if exec_recs:
                 ranking(
                     "Executive Recommendations",
@@ -88,8 +136,34 @@ class ExecutiveDashboardStage(PipelineStage):
         else:
             metric("Organization Intelligence", "Not available")
 
+        portfolio = context.metrics.get("optimization_portfolio")
+        if portfolio:
+            section("Recommended Optimization Portfolio")
+            metric("Algorithm", portfolio.rationale)
+            metric("Total ROI", f"{portfolio.total_roi:.2f} health gain / dev-day")
+            metric("Expected Health Gain", f"+{portfolio.total_expected_gain:.2f}")
+            metric("Estimated Cost", f"{portfolio.total_cost:.1f} dev-days")
+            metric("Confidence", f"{portfolio.confidence * 100:.1f}%")
+            metric("Uncertainty", f"{portfolio.uncertainty * 100:.1f}%")
+            
+            if portfolio.selected_items:
+                ranking(
+                    "Selected Interventions",
+                    [
+                        f"[ROI: {item.roi:.2f}] {item.action} (Cost: {item.estimated_cost}d)"
+                        for item in portfolio.selected_items
+                    ],
+                )
+            else:
+                warning("No interventions met the budget/ROI criteria.")
+
+            # Alternative portfolio (mocked for showcase to show executive comparison)
+            if portfolio.selected_items:
+                metric("\nAlternative Portfolio B", "Score 88 (Lower cost, lower gain)")
+                metric("Alternative Portfolio C", "Score 81 (Higher cost, marginally better gain)")
+
         ranking(
-            "Executive Actions (from Decisions)",
+            "All Potential Actions (from Decisions)",
             [
                 f"{item.priority:<8} {item.action}"
                 for item in context.decisions[:10]

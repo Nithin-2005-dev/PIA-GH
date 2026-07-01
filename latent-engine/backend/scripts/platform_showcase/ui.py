@@ -82,60 +82,59 @@ def blank():
 # Banner — shows the full canonical architecture
 # ============================================================================
 
-def banner():
+MODULE_DISPLAY_NAMES: dict[str, str] = {
+    "observation": "Observation Layer",
+    "measurement": "Measurement Layer",
+    "evidence": "Evidence Layer",
+    "estimation": "Expertise Layer",
+    "knowledge": "Knowledge Layer",
+    "graph": "Knowledge Graph Layer",
+    "temporal": "Temporal Intelligence",
+    "forecast": "Forecasting Layer",
+    "simulation": "Counterfactual Simulation Layer",
+    "intelligence": "Organization Intelligence",
+    "agent": "Reasoning Layer",
+    "decision": "Decision Layer",
+    "executive": "Executive Intelligence Report",
+}
 
+def banner(runtime):
     line()
-
     print(c("PIA LATENT ENGINE".center(WIDTH), Color.BOLD))
-
     print(c("COMPLETE PLATFORM SHOWCASE".center(WIDTH), Color.CYAN))
-
     line()
-
     print()
-
     print("Canonical Architecture")
-
     print()
-
+    
+    # We want to pull the canonical execution order from the runtime modules registry
+    order = runtime.modules.startup_order()
+    
     print(" GitHub")
-    print("    |")
-    print("    v")
-    print(" Observation Layer")
-    print("    |")
-    print("    v")
-    print(" Measurement Layer")
-    print("    |")
-    print("    v")
-    print(" Evidence Layer")
-    print("    |")
-    print("    v")
-    print(" Expertise Layer")
-    print("    |")
-    print("    v")
-    print(" Knowledge Layer")
-    print("    |")
-    print("    v")
-    print(c(" Knowledge Graph Layer", Color.CYAN))
-    print("    |")
-    print("    v")
-    print(c(" Temporal Intelligence", Color.YELLOW))
-    print("    |")
-    print("    v")
-    print(c(" Organization Intelligence", Color.MAGENTA))
-    print(c("    |  (Ownership . Coverage . Concentration . Bus Factor", Color.DIM))
-    print(c("    |   Successor . Knowledge Risk . Health . Recommendations)", Color.DIM))
-    print("    v")
-    print(" Reasoning Layer")
-    print("    |")
-    print("    v")
-    print(" Decision Layer")
-    print("    |")
-    print("    v")
-    print(" Executive Intelligence Report")
+    for module_name in order:
+        if module_name == "forecasting": 
+            continue  # Skip legacy duplicate
+            
+        display_name = MODULE_DISPLAY_NAMES.get(module_name, f"{module_name.title()} Layer")
+        
+        # Apply specific colors for emphasis
+        if module_name == "graph":
+            display_name = c(display_name, Color.CYAN)
+        elif module_name in ("temporal", "forecast", "simulation"):
+            display_name = c(display_name, Color.YELLOW)
+        elif module_name == "intelligence":
+            display_name = c(display_name, Color.MAGENTA)
+            
+        print("    |")
+        print("    v")
+        print(f" {display_name}")
+        
+        # Add the specific hint for org intel
+        if module_name == "intelligence":
+            print(c("    |  (Ownership . Coverage . Concentration . Bus Factor", Color.DIM))
+            print(c("    |   Successor . Knowledge Risk . Health . Recommendations)", Color.DIM))
 
     blank()
-
     line()
 
 

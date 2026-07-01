@@ -53,9 +53,51 @@ class DecisionStage(PipelineStage):
                 )
             )
 
-        priority_rank = {"high": 3, "medium": 2, "low": 1}
+        priority_rank = {"high": 3, "medium": 2, "low": 1, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
+        
+        # Process Simulation Scenarios
+        sim_context = getattr(context, "simulation_context", None)
+        if sim_context and context.org_intelligence:
+            try:
+                from app.simulation.engine import ScenarioComparisonEngine
+                comp_engine = context.resolve(ScenarioComparisonEngine)
+                for scenario_ctx in sim_context.scenarios:
+                    comp = comp_engine.compare(
+                        context.org_intelligence,
+                        scenario_ctx.execution_result.org_intelligence if scenario_ctx.execution_result else None
+                    )
+                    scenario_ctx.comparison = comp
+                    
+                    if "Transfer" in scenario_ctx.scenario.name:
+                        action_title = "Priority 1: Transfer ownership"
+                        action_desc = f"Estimated Health Gain {comp.health_delta*100:+.0f}%"
+                        priority = "high"
+                    elif "Departure" in scenario_ctx.scenario.name:
+                        action_title = "Knowledge Risk Escalation"
+                        action_desc = f"Prepare for Bus Factor {comp.bus_factor_delta:+} drop"
+                        priority = "high"
+                    else:
+                        action_title = f"Simulation: {scenario_ctx.scenario.name}"
+                        action_desc = f"Projected Health Delta: {comp.health_delta:+.2f}"
+                        priority = comp.recommendation_priority.lower()
+
+                    if comp.impact_score > 0 or priority == "high":
+                        decisions.append(
+                            Decision(
+                                id=str(uuid5(NAMESPACE_URL, f"sim|{scenario_ctx.scenario.name}")),
+                                title=action_title,
+                                action=action_desc,
+                                priority=priority,
+                                confidence=comp.confidence,
+                                uncertainty=0.1,
+                                reasoning_ids=(),
+                            )
+                        )
+            except Exception as e:
+                warning(f"Failed to process simulation decisions: {e}")
+
         decisions.sort(
-            key=lambda item: (priority_rank[item.priority], item.confidence),
+            key=lambda item: (priority_rank.get(item.priority, 1), item.confidence),
             reverse=True,
         )
         context.decisions = decisions

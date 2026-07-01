@@ -454,23 +454,34 @@ class SimulationPlatformModule(BaseModule):
     name = "simulation"
     version = "1.0"
     dependencies = (
-        "estimation",
-        "forecasting",
+        "forecast",
     )
     capabilities = (
         "simulation.engine",
-        "simulation.scenario",
+        "simulation.registry",
+        "simulation.comparison",
     )
 
     def configure_services(
         self,
         services: ServiceCollection,
     ) -> None:
-        from app.simulation.simulation_engine import SimulationEngine
+        from app.simulation.engine import SimulationEngine, ScenarioComparisonEngine
+        from app.simulation.registry import SimulationRegistry
 
         services.add(
             SimulationEngine,
-            SimulationEngine,
+            lambda _: SimulationEngine(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ScenarioComparisonEngine,
+            lambda _: ScenarioComparisonEngine(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            SimulationRegistry,
+            lambda _: SimulationRegistry(),
             scope=ServiceScope.SINGLETON,
         )
 
@@ -571,6 +582,7 @@ class IntelligencePlatformModule(BaseModule):
     dependencies = (
         "forecast",
         "forecasting",  # Legacy dependency kept for backwards compatibility
+        "simulation",
     )
     capabilities = (
         "intelligence.context",
@@ -617,8 +629,7 @@ class IntelligencePlatformModule(BaseModule):
         from app.query.expertise_query_service import ExpertiseQueryService
         from app.risk.bus_factor_service import BusFactorService
         from app.risk.policies.ownership_bus_factor_policy import OwnershipBusFactorPolicy
-        from app.simulation.policies.expertise_readiness_policy import ExpertiseReadinessPolicy
-        from app.simulation.readiness_service import ReadinessService
+
         from app.successor.policies.expertise_successor_policy import ExpertiseSuccessorPolicy
         from app.successor.successor_service import SuccessorService
 
@@ -765,20 +776,7 @@ class IntelligencePlatformModule(BaseModule):
             ),
             scope=ServiceScope.SINGLETON,
         )
-        services.add(
-            ExpertiseReadinessPolicy,
-            lambda _: ExpertiseReadinessPolicy(),
-            scope=ServiceScope.SINGLETON,
-        )
-        services.add(
-            ReadinessService,
-            lambda provider: ReadinessService(
-                provider.resolve(SuccessorService),
-                provider.resolve(ExpertiseQueryService),
-                provider.resolve(ExpertiseReadinessPolicy),
-            ),
-            scope=ServiceScope.SINGLETON,
-        )
+
         services.add(
             ForecastSeverityService,
             lambda _: ForecastSeverityService(),

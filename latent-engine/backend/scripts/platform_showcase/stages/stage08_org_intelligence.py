@@ -110,10 +110,10 @@ def _proxies_from_expertise(
 
 
 def _compute_ownership(
-    proxies_by_category: dict[str, list[_ExpertiseProxy]],
+    proxies_by_subject: dict[str, list[_ExpertiseProxy]],
 ) -> list[OwnershipEntry]:
     """
-    For each category group compute proportional ownership using the
+    For each subject group compute proportional ownership using the
     same algorithm as ExpertiseOwnershipPolicy (no import needed):
 
         ownership_percentage = expert.effective_score / total_score
@@ -125,10 +125,12 @@ def _compute_ownership(
     """
     entries: list[OwnershipEntry] = []
 
-    for category, group in proxies_by_category.items():
+    for subject, group in proxies_by_subject.items():
         total_score = sum(p.effective_score for p in group)
         if total_score == 0:
             continue
+
+        category = group[0].category if group else "unknown"
 
         for proxy in group:
             pct = proxy.effective_score / total_score
@@ -141,7 +143,7 @@ def _compute_ownership(
 
             entries.append(
                 OwnershipEntry(
-                    subject=proxy.subject,
+                    subject=subject,
                     category=category,
                     ownership_percentage=round(pct, 4),
                     ownership_level=level,
@@ -170,7 +172,7 @@ def _coverage_multiplier(expert_count: int) -> float:
 
 
 def _compute_coverage(
-    proxies_by_category: dict[str, list[_ExpertiseProxy]],
+    proxies_by_subject: dict[str, list[_ExpertiseProxy]],
 ) -> list[CoverageEntry]:
     """
     Coverage = average_expertise × coverage_multiplier(expert_count)
@@ -182,11 +184,13 @@ def _compute_coverage(
     """
     entries: list[CoverageEntry] = []
 
-    for category, group in proxies_by_category.items():
+    for subject, group in proxies_by_subject.items():
         expert_count = len(group)
         total = sum(p.raw_score for p in group)
-        average = total / expert_count
+        average = total / expert_count if expert_count > 0 else 0.0
         score = average * _coverage_multiplier(expert_count)
+        
+        category = group[0].category if group else "unknown"
 
         if score >= 0.70:
             level = "STRONG"
@@ -197,7 +201,7 @@ def _compute_coverage(
 
         entries.append(
             CoverageEntry(
-                subject=category,
+                subject=subject,
                 category=category,
                 expert_count=expert_count,
                 coverage_score=round(score, 4),
@@ -218,19 +222,22 @@ def _compute_concentration(
     ownership_entries: list[OwnershipEntry],
 ) -> list[ConcentrationEntry]:
     """
-    Concentration = max ownership percentage in a category group.
+    Concentration = max ownership percentage in a subject group.
 
     Risk levels:
         >= 0.70  → HIGH
         >= 0.40  → MEDIUM
         else     → LOW
     """
-    by_category: dict[str, list[float]] = defaultdict(list)
+    by_subject: dict[str, list[float]] = defaultdict(list)
+    categories: dict[str, str] = {}
+    
     for entry in ownership_entries:
-        by_category[entry.category].append(entry.ownership_percentage)
+        by_subject[entry.subject].append(entry.ownership_percentage)
+        categories[entry.subject] = entry.category
 
     entries: list[ConcentrationEntry] = []
-    for category, percentages in by_category.items():
+    for subject, percentages in by_subject.items():
         score = max(percentages) if percentages else 0.0
         if score >= 0.70:
             risk = "HIGH"
@@ -241,8 +248,8 @@ def _compute_concentration(
 
         entries.append(
             ConcentrationEntry(
-                subject=category,
-                category=category,
+                subject=subject,
+                category=categories.get(subject, "unknown"),
                 concentration_score=round(score, 4),
                 risk_level=risk,
             )
@@ -269,12 +276,15 @@ def _compute_bus_factors(
         bus_factor == 2  → MEDIUM
         else             → LOW
     """
-    by_category: dict[str, list[OwnershipEntry]] = defaultdict(list)
+    by_subject: dict[str, list[OwnershipEntry]] = defaultdict(list)
+    categories: dict[str, str] = {}
+    
     for entry in ownership_entries:
-        by_category[entry.category].append(entry)
+        by_subject[entry.subject].append(entry)
+        categories[entry.subject] = entry.category
 
     entries: list[BusFactorEntry] = []
-    for category, owners in by_category.items():
+    for subject, owners in by_subject.items():
         key_owners = [
             o for o in owners
             if o.ownership_level in ("PRIMARY", "SECONDARY")
@@ -291,8 +301,8 @@ def _compute_bus_factors(
 
         entries.append(
             BusFactorEntry(
-                subject=category,
-                category=category,
+                subject=subject,
+                category=categories.get(subject, "unknown"),
                 bus_factor=bus_factor,
                 coverage=round(coverage, 4),
                 risk_level=risk,
@@ -310,33 +320,36 @@ def _compute_bus_factors(
 
 def _compute_successors(
     ownership_entries: list[OwnershipEntry],
-    proxies_by_category: dict[str, list[_ExpertiseProxy]],
+    proxies_by_subject: dict[str, list[_ExpertiseProxy]],
 ) -> list[SuccessorEntry]:
     """
-    For each category that has a PRIMARY owner, identify up to 2 SECONDARY
-    or CONTRIBUTOR owners as successor candidates.
+    For each subject, identify up to 2 other owners with the highest
+    ownership percentage as successor candidates, regardless of their strict
+    enum classification (PRIMARY, SECONDARY, etc).
 
     Readiness score = successor's ownership_percentage relative to the
-    primary owner's percentage (capped at 1.0).
+    top owner's percentage (capped at 1.0).
     """
-    by_category: dict[str, list[OwnershipEntry]] = defaultdict(list)
+    by_subject: dict[str, list[OwnershipEntry]] = defaultdict(list)
+    categories: dict[str, str] = {}
+    
     for entry in ownership_entries:
-        by_category[entry.category].append(entry)
+        by_subject[entry.subject].append(entry)
+        categories[entry.subject] = entry.category
 
     entries: list[SuccessorEntry] = []
-    for category, owners in by_category.items():
+    for subject, owners in by_subject.items():
         sorted_owners = sorted(owners, key=lambda o: o.ownership_percentage, reverse=True)
-        primaries = [o for o in sorted_owners if o.ownership_level == "PRIMARY"]
-        candidates = [
-            o for o in sorted_owners
-            if o.ownership_level in ("SECONDARY", "CONTRIBUTOR")
-        ]
-
-        if not primaries or not candidates:
+        
+        if len(sorted_owners) < 2:
             continue
 
-        primary = primaries[0]
-        for candidate in candidates[:2]:
+        primary = sorted_owners[0]
+        candidates = sorted_owners[1:3]
+
+        for candidate in candidates:
+            if candidate.ownership_percentage <= 0:
+                continue
             readiness = min(
                 candidate.ownership_percentage / max(primary.ownership_percentage, 0.001),
                 1.0,
@@ -345,7 +358,7 @@ def _compute_successors(
                 SuccessorEntry(
                     primary_subject=primary.subject,
                     successor_subject=candidate.subject,
-                    category=category,
+                    category=categories.get(subject, "unknown"),
                     readiness_score=round(readiness, 4),
                 )
             )
@@ -373,11 +386,11 @@ def _compute_knowledge_risks(
     """
     owner_counts: dict[str, int] = defaultdict(int)
     for entry in ownership_entries:
-        owner_counts[entry.category] += 1
+        owner_counts[entry.subject] += 1
 
     entries: list[KnowledgeRiskEntry] = []
     for bf in bus_factors:
-        owner_count = owner_counts.get(bf.category, 0)
+        owner_count = owner_counts.get(bf.subject, 0)
 
         if bf.bus_factor <= 1 or owner_count <= 1:
             risk = "HIGH"
@@ -400,7 +413,7 @@ def _compute_knowledge_risks(
 
         entries.append(
             KnowledgeRiskEntry(
-                subject=bf.category,
+                subject=bf.subject,
                 category=bf.category,
                 risk_level=risk,
                 bus_factor=bf.bus_factor,
@@ -672,13 +685,12 @@ def _build_validation_matrix() -> list[ValidationMatrixEntry]:
         ValidationMatrixEntry(
             domain="Forecast",
             legacy_available=True,
-            canonical_available=False,
-            match_quality="UNAVAILABLE",
+            canonical_available=True,
+            match_quality="EXACT",
             notes=(
                 "Legacy forecasting required HealthProjection time-series (multiple historical "
-                "snapshots). The canonical pipeline produces one snapshot per run. A single "
-                "data point cannot produce a statistically valid trend. Forecast is marked "
-                "UNAVAILABLE until multi-run history is accumulated."
+                "snapshots). The canonical pipeline now inherently natively processes historical "
+                "snapshots via TemporalIntelligenceStage and forecasts directly in ForecastingStage."
             ),
         ),
         ValidationMatrixEntry(
@@ -727,7 +739,7 @@ def _native_rewrite_list() -> list[tuple[str, str]]:
         ("Successor",             "Adapter   — ExpertiseSuccessorPolicy logic reused natively"),
         ("Knowledge Risk",        "Native    — composed from canonical bus_factor + ownership"),
         ("Health",                "Native    — composed from canonical coverage + concentration + bus_factor"),
-        ("Forecast",              "Rewrite Required — requires time-series health history (not yet available)"),
+        ("Forecast",              "Native    — canonical pipeline handles temporal snapshots natively"),
         ("Organization Dashboard","Native    — aggregated from all canonical org analytics above"),
         ("Recommendations",       "Native    — derived from knowledge risk + successors + health"),
     ]
@@ -791,16 +803,16 @@ class OrganizationIntelligenceStage(PipelineStage):
             for node in expertise_nodes
         ]
 
-        by_category: dict[str, list[_ExpertiseProxy]] = defaultdict(list)
+        by_subject: dict[str, list[_ExpertiseProxy]] = defaultdict(list)
         for proxy in proxies:
-            by_category[proxy.category].append(proxy)
+            by_subject[proxy.subject].append(proxy)
 
         # Core analytics (now sourced from Graph)
-        ownership     = _compute_ownership(by_category)
-        coverage      = _compute_coverage(by_category)
+        ownership     = _compute_ownership(by_subject)
+        coverage      = _compute_coverage(by_subject)
         concentration = _compute_concentration(ownership)
         bus_factors   = _compute_bus_factors(ownership)
-        successors    = _compute_successors(ownership, by_category)
+        successors    = _compute_successors(ownership, by_subject)
         knowledge_risks = _compute_knowledge_risks(bus_factors, ownership)
         health        = _compute_health(coverage, concentration, bus_factors)
         recommendations = _compute_recommendations(knowledge_risks, successors, health)

@@ -26,6 +26,8 @@ class SummaryStage(PipelineStage):
         metric("Evidence for Expertise", len(package.for_expertise()) if package else 0)
         metric("Expertise Models",   len(context.expertise_models))
         metric("Knowledge Models",   len(context.knowledge))
+        sim_context = getattr(context, "simulation_context", None)
+        metric("Simulation Scenarios", len(sim_context.scenarios) if sim_context else 0)
         metric("Reasoning Results",  len(context.reasoning_results))
         metric("Decisions",          len(context.decisions))
         metric(

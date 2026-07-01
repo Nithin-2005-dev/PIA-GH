@@ -6,30 +6,8 @@ Shows the actual canonical execution path and layer health checks.
 from __future__ import annotations
 
 from ..context import PlatformContext
-from ..ui import metric, section, success
+from ..ui import metric, section, success, MODULE_DISPLAY_NAMES
 from .base import PipelineStage
-
-# ---------------------------------------------------------------------------
-# Canonical module-name → human-readable display-name mapping.
-# This is the single authoritative map; stage names that appear in
-# execution_stage_names are used directly (they already carry the right label
-# from each stage class).  This dict is only a fallback for the header step
-# that must be inferred from the raw module name in execution_order.
-# ---------------------------------------------------------------------------
-_MODULE_DISPLAY_NAMES: dict[str, str] = {
-    "observation":  "Observation",
-    "measurement":  "Measurement",
-    "evidence":     "Evidence",
-    "estimation":   "Expertise",
-    "knowledge":    "Knowledge",
-    "graph":        "Knowledge Graph",
-    "temporal":     "Temporal Intelligence",
-    "intelligence": "Organization Intelligence",
-    "agent":        "Reasoning",
-    "decision":     "Decision",
-    "executive":    "Executive Dashboard",
-}
-
 
 class PipelineValidationStage(PipelineStage):
     name = "Pipeline Validation"
@@ -61,7 +39,7 @@ class PipelineValidationStage(PipelineStage):
             # not go through CanonicalPlatformPipeline.
             order: tuple[str, ...] = context.metrics.get("execution_order", ())
             path = ["GitHub Commit"] + [
-                _MODULE_DISPLAY_NAMES.get(m, m) for m in dict.fromkeys(order)
+                MODULE_DISPLAY_NAMES.get(m, m) for m in dict.fromkeys(order) if m != "forecasting"
             ]
 
         for index, name in enumerate(path):

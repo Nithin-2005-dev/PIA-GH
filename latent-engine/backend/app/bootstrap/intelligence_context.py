@@ -86,13 +86,7 @@ from app.knowledge_transfer.policies.simple_transfer_policy import (
     SimpleTransferPolicy,
 )
 
-from app.simulation.readiness_service import (
-    ReadinessService,
-)
 
-from app.simulation.policies.expertise_readiness_policy import (
-    ExpertiseReadinessPolicy,
-)
 
 from app.forecasting.forecast_severity_service import (
     ForecastSeverityService,
@@ -162,7 +156,6 @@ class IntelligenceContext:
         self.forecast_pipeline_service = provider.resolve(ForecastPipelineService)
         self.future_risk_pipeline_service = provider.resolve(FutureRiskPipelineService)
         self.transfer_service = provider.resolve(TransferService)
-        self.readiness_service = provider.resolve(ReadinessService)
         self.forecast_severity_service = provider.resolve(ForecastSeverityService)
         self.organization_risk_service = provider.resolve(OrganizationRiskService)
         self.organization_health_service = provider.resolve(OrganizationHealthService)

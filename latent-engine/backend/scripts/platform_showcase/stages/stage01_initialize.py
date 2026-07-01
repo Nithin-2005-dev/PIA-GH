@@ -69,9 +69,19 @@ class InitializeStage(PipelineStage):
 
         metric("Platform", "PIA Latent Engine")
 
+        from ..ui import MODULE_DISPLAY_NAMES
+        
+        order = context.runtime.modules.startup_order()
+        display_names = [
+            MODULE_DISPLAY_NAMES.get(m, m.title()) 
+            for m in order 
+            if m != "forecasting"
+        ]
+        architecture_str = " -> ".join(display_names)
+
         metric(
             "Architecture",
-            "Observation -> Measurement -> Evidence -> Expertise -> Knowledge -> Knowledge Graph -> Temporal Intelligence -> Organization Intelligence -> Reasoning -> Decision",
+            architecture_str,
         )
 
         metric("Repository", context.repository)

@@ -165,8 +165,103 @@ class CanonicalPlatformPipeline:
             errors=tuple(errors),
         )
 
+    def branch(
+        self,
+        baseline_context: Any,
+        scenario: Any,
+    ) -> Any:
+        """
+        Executes a branched pipeline for a simulation scenario.
+        Starts execution from 'intelligence' onwards.
+        Returns a ScenarioContext containing the ScenarioExecutionResult.
+        """
+        from app.simulation.models import ScenarioContext, ScenarioExecutionResult
+        import time
+        import copy
+        from app.platform.event_bus import PlatformEvent
+
+        # 1. Clone context
+        import dataclasses
+        if dataclasses.is_dataclass(baseline_context):
+            cloned = copy.copy(baseline_context)
+        else:
+            cloned = copy.copy(baseline_context)
+
+        # Deep copy graph
+        if hasattr(cloned, "knowledge_graph") and cloned.knowledge_graph is not None:
+            if hasattr(cloned.knowledge_graph, "copy"):
+                cloned.knowledge_graph = cloned.knowledge_graph.copy()
+            else:
+                cloned.knowledge_graph = copy.deepcopy(cloned.knowledge_graph)
+                
+        # Shallow copy lists and dicts
+        if hasattr(cloned, "expertise_models"):
+            cloned.expertise_models = list(cloned.expertise_models)
+        if hasattr(cloned, "metrics"):
+            cloned.metrics = copy.deepcopy(cloned.metrics)
+
+        # 2. Apply interventions
+        for intervention in scenario.interventions:
+            intervention.apply(cloned)
+
+        # 3. Execute downstream stages
+        bindings = self._bindings_by_runtime_order(runtime_override=baseline_context.runtime)
+        
+        # Determine earliest restart stage dynamically based on interventions
+        restart_stages = [intervention.restart_stage() for intervention in scenario.interventions if hasattr(intervention, 'restart_stage')]
+        if not restart_stages:
+            restart_stages = ["knowledge"]  # fallback
+
+        start_idx = len(bindings)
+        for target_stage in restart_stages:
+            for i, binding in enumerate(bindings):
+                if binding.module == target_stage and i < start_idx:
+                    start_idx = i
+                    break
+                    
+        # Fallback if no matching binding found
+        if start_idx == len(bindings):
+            for i, binding in enumerate(bindings):
+                if binding.module == "intelligence":
+                    start_idx = i
+                    break
+                
+        errors = []
+        for binding in bindings[start_idx:]:
+            # We don't want to run the SummaryStage for branches, as it outputs to console and ends the showcase
+            if binding.stage.__class__.__name__ == "SummaryStage":
+                continue
+            if binding.stage.__class__.__name__ == "ExecutiveDashboardStage":
+                continue
+            if binding.stage.__class__.__name__ == "PipelineValidationStage":
+                continue
+            if binding.module == "simulation" or binding.stage.__class__.__name__ == "SimulationStage":
+                continue
+
+            try:
+                binding.stage.run(cloned)
+            except Exception as exc:
+                errors.append(f"{binding.stage.name}: {exc}")
+                break
+
+        # 4. Package results
+        result = ScenarioExecutionResult(
+            org_intelligence=getattr(cloned, "org_intelligence", None),
+            reasoning_results=getattr(cloned, "reasoning_results", ()),
+            decisions=getattr(cloned, "decisions", ()),
+            metrics=getattr(cloned, "metrics", {}),
+        )
+
+        return ScenarioContext(
+            scenario=scenario,
+            baseline_context=baseline_context,
+            cloned_context=cloned,
+            execution_result=result,
+        )
+
     def _bindings_by_runtime_order(
         self,
+        runtime_override=None,
     ) -> list[CanonicalStageBinding]:
         from scripts.platform_showcase.stages.stage01_initialize import InitializeStage
         from scripts.platform_showcase.stages.stage02_collection import CollectionStage
@@ -178,9 +273,11 @@ class CanonicalPlatformPipeline:
         from scripts.platform_showcase.stages.stage07b_graph import KnowledgeGraphStage
         from scripts.platform_showcase.stages.stage07c_temporal import TemporalIntelligenceStage
         from scripts.platform_showcase.stages.stage07d_forecast import ForecastingStage
+        from scripts.platform_showcase.stages.stage07e_simulation import SimulationStage
         from scripts.platform_showcase.stages.stage08_org_intelligence import OrganizationIntelligenceStage
         from scripts.platform_showcase.stages.stage09_reasoning import ReasoningStage
         from scripts.platform_showcase.stages.stage10_decision import DecisionStage
+        from scripts.platform_showcase.stages.stage10b_optimization import PortfolioOptimizationStage
         from scripts.platform_showcase.stages.stage11_executive import ExecutiveDashboardStage
         from scripts.platform_showcase.stages.stage12_validation import PipelineValidationStage
         from scripts.platform_showcase.stages.stage13_summary import SummaryStage
@@ -262,6 +359,14 @@ class CanonicalPlatformPipeline:
                     "PlatformContext.forecast_context",
                 ),
             ),
+            "simulation": (
+                CanonicalStageBinding(
+                    "simulation",
+                    SimulationStage(),
+                    "PlatformContext.forecast_context",
+                    "PlatformContext.simulation_context",
+                ),
+            ),
             "intelligence": (
                 CanonicalStageBinding(
                     "intelligence",
@@ -284,6 +389,12 @@ class CanonicalPlatformPipeline:
                     DecisionStage(),
                     "PlatformContext.reasoning_results",
                     "PlatformContext.decisions",
+                ),
+                CanonicalStageBinding(
+                    "decision",
+                    PortfolioOptimizationStage(),
+                    "PlatformContext.decisions",
+                    "PlatformContext.metrics.optimization_portfolio",
                 ),
             ),
             "executive": (
@@ -309,6 +420,7 @@ class CanonicalPlatformPipeline:
         }
 
         bindings: list[CanonicalStageBinding] = []
-        for module in self._built.runtime.modules.startup_order():
+        runtime = runtime_override or self._built.runtime
+        for module in runtime.modules.startup_order():
             bindings.extend(by_module.get(module, ()))
         return bindings
