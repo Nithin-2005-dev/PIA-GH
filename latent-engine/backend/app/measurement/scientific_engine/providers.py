@@ -279,13 +279,127 @@ class DocumentationMeasurementProvider(BaseMeasurementProvider):
         )
 
 
+class StaticAnalysisMeasurementProvider(BaseMeasurementProvider):
+    name = "static_analysis"
+    supported_types = (ObservationType.COMMIT,)
+
+    def measure(
+        self,
+        observation: Observation,
+        context: MeasurementContext,
+        registry: ScientificMeasurementRegistry,
+    ) -> tuple[Measurement, ...]:
+        if not isinstance(observation.facts, CommitFacts):
+            return ()
+        facts = observation.facts
+        files = facts.files
+        file_count = max(1, len(files))
+        total_changed = facts.total_changes or sum(
+            file.changes
+            for file in files
+        )
+        test_files = [
+            file
+            for file in files
+            if self._is_test_path(file.path)
+        ]
+        largest_file_delta = max(
+            (
+                file.changes
+                for file in files
+            ),
+            default=0,
+        )
+        patch_complexity = sum(
+            self._patch_complexity(file.patch)
+            for file in files
+        ) + len(files)
+        churn_ratio = (
+            (
+                facts.total_additions
+                + facts.total_deletions
+            )
+            / max(1.0, float(total_changed))
+        )
+
+        return (
+            self._measurement(
+                observation,
+                context,
+                registry,
+                "code_churn_ratio",
+                min(1.0, churn_ratio),
+                precision=0.001,
+            ),
+            self._measurement(
+                observation,
+                context,
+                registry,
+                "test_file_touch_ratio",
+                len(test_files) / file_count,
+                precision=0.001,
+            ),
+            self._measurement(
+                observation,
+                context,
+                registry,
+                "largest_file_delta",
+                largest_file_delta,
+            ),
+            self._measurement(
+                observation,
+                context,
+                registry,
+                "patch_complexity_score",
+                patch_complexity,
+            ),
+        )
+
+    def _is_test_path(
+        self,
+        path: str,
+    ) -> bool:
+        normalized = path.replace("\\", "/").lower()
+        return (
+            "/test/" in normalized
+            or "/tests/" in normalized
+            or normalized.startswith("test_")
+            or normalized.endswith("_test.py")
+            or normalized.endswith(".test.ts")
+            or normalized.endswith(".spec.ts")
+        )
+
+    def _patch_complexity(
+        self,
+        patch: str | None,
+    ) -> int:
+        if not patch:
+            return 0
+        keywords = (
+            " if ",
+            " elif ",
+            " for ",
+            " while ",
+            " case ",
+            " catch ",
+            "&&",
+            "||",
+            "?",
+        )
+        lowered = f" {patch.lower()} "
+        return sum(
+            lowered.count(keyword)
+            for keyword in keywords
+        )
+
+
 def default_measurement_providers(
 ) -> tuple[MeasurementProvider, ...]:
     return (
         StructuralMeasurementProvider(),
+        StaticAnalysisMeasurementProvider(),
         ReviewMeasurementProvider(),
         RepositoryMeasurementProvider(),
         EngineeringMeasurementProvider(),
         DocumentationMeasurementProvider(),
     )
-

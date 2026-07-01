@@ -9,6 +9,7 @@ from app.measurement.scientific_engine.providers import MeasurementProvider
 from app.measurement.scientific_engine.providers import MeasurementProviderRegistry
 from app.measurement.scientific_engine.providers import RepositoryMeasurementProvider
 from app.measurement.scientific_engine.providers import ReviewMeasurementProvider
+from app.measurement.scientific_engine.providers import StaticAnalysisMeasurementProvider
 from app.measurement.scientific_engine.providers import StructuralMeasurementProvider
 from app.measurement.scientific_engine.providers import default_measurement_providers
 from app.measurement.scientific_engine.registry import MeasurementDataType
@@ -16,4 +17,3 @@ from app.measurement.scientific_engine.registry import ScientificMeasurementDefi
 from app.measurement.scientific_engine.registry import ScientificMeasurementRegistry
 from app.measurement.scientific_engine.registry import default_scientific_measurements
 from app.measurement.scientific_engine.statistics import ScientificStatistics
-
