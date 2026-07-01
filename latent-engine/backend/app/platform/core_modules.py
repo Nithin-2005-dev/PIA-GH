@@ -8,7 +8,7 @@ from app.platform.module import BaseModule
 class MeasurementPlatformModule(BaseModule):
     name = "measurement"
     version = "1.0"
-    dependencies = ()
+    dependencies = ("observation",)
     capabilities = (
         "measurement.provider",
         "measurement.engine",
@@ -23,6 +23,94 @@ class MeasurementPlatformModule(BaseModule):
         services.add(
             MeasurementEngine,
             lambda _: MeasurementEngine.default(),
+            scope=ServiceScope.SINGLETON,
+        )
+
+
+class ObservationPlatformModule(BaseModule):
+    name = "observation"
+    version = "1.0"
+    dependencies = ()
+    capabilities = (
+        "observation.ingestion",
+        "observation.adapter",
+        "observation.replay",
+    )
+
+    def configure_services(
+        self,
+        services: ServiceCollection,
+    ) -> None:
+        from app.observation.ingestion import AdapterRegistry
+        from app.observation.ingestion import CheckpointStore
+        from app.observation.ingestion import ObservationDeduplicator
+        from app.observation.ingestion import ObservationIngestionEngine
+        from app.observation.ingestion import ObservationIngestionStore
+        from app.observation.ingestion import ObservationMetrics
+        from app.observation.ingestion import ObservationNormalizer
+        from app.observation.ingestion import RateLimiter
+        from app.observation.ingestion import UnifiedIdentityResolver
+        from app.observation.validation import ObservationValidationPipeline
+
+        services.add(
+            AdapterRegistry,
+            AdapterRegistry,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            UnifiedIdentityResolver,
+            UnifiedIdentityResolver,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ObservationNormalizer,
+            lambda provider: ObservationNormalizer(
+                provider.resolve(UnifiedIdentityResolver)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ObservationValidationPipeline,
+            ObservationValidationPipeline,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ObservationIngestionStore,
+            ObservationIngestionStore,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            CheckpointStore,
+            CheckpointStore,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ObservationDeduplicator,
+            ObservationDeduplicator,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            RateLimiter,
+            RateLimiter,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ObservationMetrics,
+            ObservationMetrics,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ObservationIngestionEngine,
+            lambda provider: ObservationIngestionEngine(
+                adapters=provider.resolve(AdapterRegistry),
+                normalizer=provider.resolve(ObservationNormalizer),
+                validator=provider.resolve(ObservationValidationPipeline),
+                store=provider.resolve(ObservationIngestionStore),
+                checkpoints=provider.resolve(CheckpointStore),
+                deduplicator=provider.resolve(ObservationDeduplicator),
+                rate_limiter=provider.resolve(RateLimiter),
+                metrics=provider.resolve(ObservationMetrics),
+            ),
             scope=ServiceScope.SINGLETON,
         )
 
@@ -213,6 +301,7 @@ class ExecutivePlatformModule(BaseModule):
 def default_platform_modules(
 ) -> tuple[BaseModule, ...]:
     return (
+        ObservationPlatformModule(),
         MeasurementPlatformModule(),
         EvidencePlatformModule(),
         EstimationPlatformModule(),
@@ -222,4 +311,3 @@ def default_platform_modules(
         AgentPlatformModule(),
         ExecutivePlatformModule(),
     )
-

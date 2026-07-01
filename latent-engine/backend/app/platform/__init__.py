@@ -19,6 +19,7 @@ from app.platform.core_modules import ExecutivePlatformModule
 from app.platform.core_modules import ForecastingPlatformModule
 from app.platform.core_modules import GraphPlatformModule
 from app.platform.core_modules import MeasurementPlatformModule
+from app.platform.core_modules import ObservationPlatformModule
 from app.platform.core_modules import SimulationPlatformModule
 from app.platform.core_modules import default_platform_modules
 from app.platform.di import ServiceCollection

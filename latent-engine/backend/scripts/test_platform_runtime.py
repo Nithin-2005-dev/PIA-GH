@@ -374,6 +374,7 @@ def main():
     default_built.start()
 
     assert default_runtime.modules.startup_order() == (
+        "observation",
         "measurement",
         "evidence",
         "estimation",
@@ -407,4 +408,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

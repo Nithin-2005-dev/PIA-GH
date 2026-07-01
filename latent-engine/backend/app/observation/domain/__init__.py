@@ -12,8 +12,12 @@ class ObservationType(Enum):
     PULL_REQUEST = "pull_request"
     ISSUE = "issue"
     REVIEW = "review"
+    COMMENT = "comment"
+    MERGE = "merge"
     BUILD = "build"
     DEPLOYMENT = "deployment"
+    INCIDENT = "incident"
+    RELEASE = "release"
     RUNTIME = "runtime"
     SECURITY = "security"
     TEST = "test"
@@ -133,6 +137,26 @@ class ReviewFacts:
 
 
 @dataclass(frozen=True)
+class CommentFacts:
+    comment_id: str
+    subject_id: str
+    author: str | None
+    body: str
+    created_at: datetime
+    updated_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class MergeFacts:
+    merge_id: str
+    source_ref: str
+    target_ref: str
+    merged_by: str | None
+    merged_at: datetime
+    commit_id: str | None = None
+
+
+@dataclass(frozen=True)
 class BuildFacts:
     build_id: str
     status: str
@@ -148,6 +172,26 @@ class DeploymentFacts:
     status: str
     deployed_at: datetime
     version: str | None = None
+
+
+@dataclass(frozen=True)
+class IncidentFacts:
+    incident_id: str
+    title: str
+    severity: str
+    status: str
+    started_at: datetime
+    resolved_at: datetime | None = None
+    service: str | None = None
+
+
+@dataclass(frozen=True)
+class ReleaseFacts:
+    release_id: str
+    version: str
+    status: str
+    released_at: datetime
+    author: str | None = None
 
 
 @dataclass(frozen=True)
@@ -221,8 +265,12 @@ CanonicalFacts = (
     | PullRequestFacts
     | IssueFacts
     | ReviewFacts
+    | CommentFacts
+    | MergeFacts
     | BuildFacts
     | DeploymentFacts
+    | IncidentFacts
+    | ReleaseFacts
     | RuntimeFacts
     | SecurityFacts
     | TestFacts
