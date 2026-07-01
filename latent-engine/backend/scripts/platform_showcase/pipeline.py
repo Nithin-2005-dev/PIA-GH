@@ -22,7 +22,7 @@ class PlatformPipeline:
 
         progress = {
             "index": 0,
-            "total": 14,
+            "total": 15,
         }
 
         def show_progress(event):
@@ -50,6 +50,17 @@ class PlatformPipeline:
         context = result.context
         org = context.org_intelligence
         package = context.evidence_package
+        
+        historical = getattr(context, "historical_context", None)
+        if historical:
+            from .ui import section, success, metric, error
+            section("Persistence")
+            if "snapshot_error" in context.metrics:
+                error(f"Snapshot persistence failed: {context.metrics['snapshot_error']}")
+            else:
+                success("Snapshot persisted")
+                metric("Total Snapshots", historical.snapshot_count + 1)
+
         summary(
             "CANONICAL RUNTIME COMPLETE",
             [

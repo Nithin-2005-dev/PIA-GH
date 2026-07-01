@@ -78,9 +78,15 @@ def synthetic_bindings(
             "PlatformContext.knowledge_graph",
         ),
         CanonicalStageBinding(
+            "temporal",
+            SyntheticStage("Temporal Intelligence", "historical_context", [1]),
+            "PlatformContext.knowledge_graph",
+            "PlatformContext.historical_context",
+        ),
+        CanonicalStageBinding(
             "intelligence",
             SyntheticStage("Organization Intelligence", "org_intelligence", [1]),
-            "PlatformContext.knowledge_graph",
+            "PlatformContext.historical_context",
             "PlatformContext.org_intelligence",
         ),
         CanonicalStageBinding(
@@ -139,6 +145,7 @@ def main():
         "estimation",
         "knowledge",
         "graph",        # Knowledge Graph must appear as a first-class stage
+        "temporal",
         "intelligence",
         "agent",
         "decision",
@@ -190,8 +197,12 @@ def main():
         "'graph' must come after 'knowledge' in execution_order. "
         "Actual order: " + str(order_list)
     )
-    assert order_list.index("graph") < order_list.index("intelligence"), (
-        "'intelligence' must come after 'graph' in execution_order. "
+    assert order_list.index("graph") < order_list.index("temporal"), (
+        "'temporal' must come after 'graph' in execution_order. "
+        "Actual order: " + str(order_list)
+    )
+    assert order_list.index("temporal") < order_list.index("intelligence"), (
+        "'intelligence' must come after 'temporal' in execution_order. "
         "Actual order: " + str(order_list)
     )
 

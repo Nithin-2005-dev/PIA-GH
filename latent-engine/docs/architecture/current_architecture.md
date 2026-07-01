@@ -27,6 +27,9 @@ Knowledge Layer
 Knowledge Graph Layer       ← graph module; depends on knowledge
      |
      v
+Temporal Intelligence       ← temporal module; computes deltas and trends
+     |
+     v
 Organization Intelligence   ← intelligence module; depends on graph
      |
      v

@@ -306,6 +306,47 @@ class GraphPlatformModule(BaseModule):
         )
 
 
+class TemporalPlatformModule(BaseModule):
+    name = "temporal"
+    version = "1.0"
+    dependencies = ("graph",)
+    capabilities = (
+        "temporal.snapshot",
+        "temporal.history",
+        "temporal.trend",
+    )
+
+    def configure_services(
+        self,
+        services: ServiceCollection,
+    ) -> None:
+        from pathlib import Path
+        from app.temporal.graph_diff import GraphDiffEngine
+        from app.temporal.snapshot_repository import SnapshotRepository
+        from app.temporal.temporal_engine import TemporalEngine
+
+        services.add(
+            SnapshotRepository,
+            lambda _: SnapshotRepository(
+                root=Path("outputs/showcase/history/snapshots")
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            GraphDiffEngine,
+            lambda _: GraphDiffEngine(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            TemporalEngine,
+            lambda provider: TemporalEngine(
+                repository=provider.resolve(SnapshotRepository),
+                graph_diff=provider.resolve(GraphDiffEngine),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+
+
 class KnowledgePlatformModule(BaseModule):
     name = "knowledge"
     version = "1.0"
@@ -314,6 +355,63 @@ class KnowledgePlatformModule(BaseModule):
         "knowledge.model",
         "knowledge.contract",
     )
+
+
+class ForecastPlatformModule(BaseModule):
+    name = "forecast"
+    version = "1.0"
+    dependencies = ("temporal",)
+    capabilities = (
+        "forecast.engine",
+        "forecast.models",
+    )
+
+    def configure_services(
+        self,
+        services: ServiceCollection,
+    ) -> None:
+        from app.forecast.baseline_models import (
+            ConstantBaselineModel,
+            ExponentialSmoothingModel,
+            LinearTrendModel,
+            MomentumProjectionModel,
+            MovingAverageModel,
+        )
+        from app.forecast.engine import ForecastEngine, ForecastRegistry
+        from app.forecast.factory import TimeSeriesFactory
+
+        # Register baseline models
+        services.add(LinearTrendModel, LinearTrendModel, scope=ServiceScope.SINGLETON)
+        services.add(ExponentialSmoothingModel, ExponentialSmoothingModel, scope=ServiceScope.SINGLETON)
+        services.add(MovingAverageModel, MovingAverageModel, scope=ServiceScope.SINGLETON)
+        services.add(MomentumProjectionModel, MomentumProjectionModel, scope=ServiceScope.SINGLETON)
+        services.add(ConstantBaselineModel, ConstantBaselineModel, scope=ServiceScope.SINGLETON)
+
+        # Register and populate the Registry
+        def build_registry(provider):
+            registry = ForecastRegistry()
+            # Register in priority order
+            registry.register(provider.resolve(LinearTrendModel))
+            registry.register(provider.resolve(MomentumProjectionModel))
+            registry.register(provider.resolve(MovingAverageModel))
+            registry.register(provider.resolve(ExponentialSmoothingModel))
+            registry.register(provider.resolve(ConstantBaselineModel))
+            return registry
+
+        services.add(
+            ForecastRegistry,
+            build_registry,
+            scope=ServiceScope.SINGLETON,
+        )
+
+        services.add(
+            ForecastEngine,
+            lambda provider: ForecastEngine(
+                registry=provider.resolve(ForecastRegistry),
+                factory=TimeSeriesFactory,
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
 
 
 class ForecastingPlatformModule(BaseModule):
@@ -471,7 +569,8 @@ class IntelligencePlatformModule(BaseModule):
     name = "intelligence"
     version = "1.0"
     dependencies = (
-        "graph",
+        "forecast",
+        "forecasting",  # Legacy dependency kept for backwards compatibility
     )
     capabilities = (
         "intelligence.context",
@@ -732,6 +831,8 @@ def default_platform_modules(
         EstimationPlatformModule(),
         KnowledgePlatformModule(),
         GraphPlatformModule(),
+        TemporalPlatformModule(),
+        ForecastPlatformModule(),
         IntelligencePlatformModule(),
         ForecastingPlatformModule(),
         SimulationPlatformModule(),

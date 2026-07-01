@@ -136,6 +136,17 @@ class CanonicalPlatformPipeline:
                 )
                 break
 
+        # Automatic snapshot persistence on successful execution
+        if not errors:
+            try:
+                from app.temporal.temporal_engine import TemporalEngine
+                engine = self._built.provider.resolve(TemporalEngine)
+                snapshot = engine.create_snapshot(context)
+                engine.repository.save(snapshot)
+            except Exception as e:
+                # Snapshot persistence is best-effort
+                context.metrics["snapshot_error"] = str(e)
+
         self._built.runtime.event_bus.publish(
             PlatformEvent(
                 type="runtime.pipeline.completed",
@@ -165,6 +176,7 @@ class CanonicalPlatformPipeline:
         from scripts.platform_showcase.stages.stage06_repository import ExpertiseStage
         from scripts.platform_showcase.stages.stage07_knowledge import KnowledgeStage
         from scripts.platform_showcase.stages.stage07b_graph import KnowledgeGraphStage
+        from scripts.platform_showcase.stages.stage07c_temporal import TemporalIntelligenceStage
         from scripts.platform_showcase.stages.stage08_org_intelligence import OrganizationIntelligenceStage
         from scripts.platform_showcase.stages.stage09_reasoning import ReasoningStage
         from scripts.platform_showcase.stages.stage10_decision import DecisionStage
@@ -233,11 +245,19 @@ class CanonicalPlatformPipeline:
                     "PlatformContext.knowledge_graph",
                 ),
             ),
+            "temporal": (
+                CanonicalStageBinding(
+                    "temporal",
+                    TemporalIntelligenceStage(),
+                    "PlatformContext.knowledge_graph",
+                    "PlatformContext.historical_context",
+                ),
+            ),
             "intelligence": (
                 CanonicalStageBinding(
                     "intelligence",
                     OrganizationIntelligenceStage(),
-                    "PlatformContext.knowledge_graph",
+                    "PlatformContext.historical_context",
                     "PlatformContext.org_intelligence",
                 ),
             ),
