@@ -174,10 +174,16 @@ class EvidencePlatformModule(BaseModule):
         services: ServiceCollection,
     ) -> None:
         from app.evidence.synthesis.engine import EvidenceSynthesisEngine
+        from app.evidence.semantic import SemanticEvidenceEngine
 
         services.add(
             EvidenceSynthesisEngine,
             EvidenceSynthesisEngine,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            SemanticEvidenceEngine,
+            SemanticEvidenceEngine,
             scope=ServiceScope.SINGLETON,
         )
 
