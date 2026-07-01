@@ -263,8 +263,14 @@ class GraphPlatformModule(BaseModule):
         services: ServiceCollection,
     ) -> None:
         from app.graph.graph_service import GraphService
+        from app.graph.builders import KnowledgeGraphBuilder
         from app.graph.organizational_graph import OrganizationalGraph
 
+        services.add(
+            KnowledgeGraphBuilder,
+            lambda _: KnowledgeGraphBuilder(),
+            scope=ServiceScope.SINGLETON,
+        )
         services.add(
             OrganizationalGraph,
             lambda _: OrganizationalGraph(
