@@ -2,7 +2,6 @@ from datetime import UTC
 from datetime import datetime
 from pathlib import Path
 import sys
-from uuid import uuid4
 
 sys.path.insert(
     0,
@@ -13,905 +12,415 @@ sys.path.insert(
 
 from app.domain.entity_ref import EntityRef
 from app.domain.entity_type import EntityType
-from app.domain.event import Event
-from app.domain.event_type import EventType
+from app.measurement.core.recompute import MeasurementDependencyGraph
 from app.measurement.domain import MeasurementContext
-from app.measurement.domain import MeasurementDefinition
-from app.measurement.domain import SoftwareSignal
 from app.measurement.domain import MeasurementUnit
 from app.measurement.domain import ValidationStatus
-from app.measurement.benchmark import BenchmarkEngine
-from app.measurement.benchmark_datasets import BenchmarkDataset
-from app.measurement.benchmark_datasets import BenchmarkDatasetRegistry
-from app.measurement.benchmark_datasets import BenchmarkScope
-from app.measurement.catalog import DefaultMeasurementCatalog
-from app.measurement.accuracy import EnterpriseAccuracyPipeline
-from app.measurement.accuracy_profiles import AccuracyProfileRegistry
-from app.measurement.active import ActiveMeasurementService
-from app.measurement.compression import ApproximateHistogramBuilder
-from app.measurement.compression import ReservoirSampler
-from app.measurement.confidence_calibration import ConfidenceCalibrationModel
-from app.measurement.confidence_calibration import ConfidenceObservation
-from app.measurement.contracts import MeasurementContract
-from app.measurement.contracts import MeasurementContractValidator
-from app.measurement.contracts import MeasurementLifecycle
-from app.measurement.domain_packs import DefaultDomainPacks
-from app.measurement.dsl import MeasurementDslParser
-from app.measurement.engine import MeasurementEngine
-from app.measurement.execution import CandidateMeasurementPath
-from app.measurement.execution import CostBasedMeasurementOptimizer
-from app.measurement.execution import MeasurementComputationNode
-from app.measurement.execution import MeasurementExecutionPlanner
-from app.measurement.execution import MeasurementExecutor
-from app.measurement.formula import DerivedMeasurementEngine
-from app.measurement.formula import FormulaDefinition
-from app.measurement.fusion import MultiSourceFusionEngine
-from app.measurement.fusion import ProbabilisticFusionEngine
-from app.measurement.lineage import MeasurementExplainer
-from app.measurement.lineage import MeasurementLineageService
-from app.measurement.lineage_query import MeasurementLineageQueryEngine
-from app.measurement.knowledge_api import MeasurementKnowledgeApi
-from app.measurement.mapping import MappingCardinality
-from app.measurement.mapping import SignalMeasurementMapping
-from app.measurement.mapping import SignalMeasurementMappingRegistry
-from app.measurement.mapping import SignalToMeasurementMapper
-from app.measurement.measurement_knowledge import DefaultSoftwareMeasurementKnowledge
-from app.measurement.ml import CalibrationResult
-from app.measurement.ml import MeasurementCalibrationModel
-from app.measurement.ml import MlCalibrationService
-from app.measurement.mql import MqlEngine
-from app.measurement.mql import MqlParser
-from app.measurement.ontology import MeasurementOntology
-from app.measurement.packs import MeasurementMarketplace
-from app.measurement.packs import MeasurementPack
-from app.measurement.scientific_api import ScientificMeasurementApi
-from app.measurement.scientific_catalog import EnterpriseMeasurementCatalog
-from app.measurement.scientific_validation import CatalogValidationService
-from app.measurement.scientific_validation import ScientificValidationEngine
-from app.measurement.recompute import MeasurementDependencyGraph
-from app.measurement.semantic_graph import ConceptRelationship
-from app.measurement.semantic_graph import SemanticMeasurementEdge
-from app.measurement.semantic_graph import SemanticMeasurementGraph
-from app.measurement.signal_classifier import SemanticSignalClassifier
-from app.measurement.signal_ontology import SignalOntology
-from app.measurement.signal_validation import SemanticMappingValidator
-from app.measurement.signal_validation import SignalDefinitionValidator
-from app.measurement.signals import DefaultSignalCatalog
-from app.measurement.standards import StandardsCatalog
-from app.measurement.statistical_pipeline import StatisticsPipeline
-from app.measurement.store import MeasurementCache
-from app.measurement.store import TemporalMeasurementStore
-from app.measurement.streaming import StreamingMeasurementEngine
-from app.measurement.test_corpus import MeasurementTestCorpus
+from app.measurement.scientific_engine import MeasurementAggregationEngine
+from app.measurement.scientific_engine import MeasurementDataType
+from app.measurement.scientific_engine import MeasurementProviderRegistry
+from app.measurement.scientific_engine import ScientificMeasurementDefinition
+from app.measurement.scientific_engine import ScientificMeasurementEngine
+from app.measurement.scientific_engine import ScientificMeasurementRegistry
+from app.measurement.scientific_engine import ScientificStatistics
+from app.measurement.scientific_engine import default_measurement_providers
+from app.measurement.scientific_engine import default_scientific_measurements
+from app.measurement.scientific_engine.providers import BaseMeasurementProvider
+from app.observation.domain import BuildFacts
+from app.observation.domain import CommitFacts
+from app.observation.domain import DocumentationFacts
+from app.observation.domain import FileChangeFacts
+from app.observation.domain import IssueFacts
+from app.observation.domain import Observation
+from app.observation.domain import ObservationCategory
+from app.observation.domain import ObservationContext
+from app.observation.domain import ObservationLifecycle
+from app.observation.domain import ObservationProvenance
+from app.observation.domain import ObservationType
+from app.observation.domain import PullRequestFacts
+from app.observation.domain import ReviewFacts
+from app.observation.domain import TestFacts
+from app.platform import PlatformRuntime
+from app.platform import default_platform_modules
 
 
-class DemoCalibrationModel(MeasurementCalibrationModel):
+def obs(
+    observation_id,
+    observation_type,
+    category,
+    facts,
+    targets=(),
+):
+    return Observation(
+        observation_id=observation_id,
+        trace_id=f"trace-{observation_id}",
+        correlation_id=f"corr-{observation_id}",
+        timestamp=datetime(
+            2026,
+            7,
+            1,
+            12,
+            0,
+            tzinfo=UTC,
+        ),
+        observation_type=observation_type,
+        observation_category=category,
+        source_platform="github",
+        source_adapter="github",
+        version="1.0",
+        lifecycle=ObservationLifecycle.PRODUCTION,
+        actors=(
+            EntityRef(
+                id="alice",
+                type=EntityType.DEVELOPER,
+            ),
+        ),
+        targets=targets,
+        provenance=ObservationProvenance(
+            source_platform="github",
+            source_adapter="github",
+            source_record_id=observation_id,
+        ),
+        context=ObservationContext(
+            repository="pia",
+            organization="acme",
+            tenant_id="tenant-a",
+        ),
+        facts=facts,
+    )
 
-    def calibrate(
+
+class CustomCommitProvider(BaseMeasurementProvider):
+    name = "custom_commit_provider"
+    version = "1.0"
+    supported_types = (ObservationType.COMMIT,)
+
+    def measure(
         self,
-        measurement,
+        observation,
+        context,
+        registry,
     ):
-        return CalibrationResult(
-            calibrated_value=measurement.value + 1.0,
-            confidence_adjustment=0.01,
-            model_name="demo-calibrator",
-            model_version="1.0",
+        return (
+            self._measurement(
+                observation,
+                context,
+                registry,
+                "custom_commit_constant",
+                1.0,
+            ),
         )
 
 
-def developer(
-    name,
-):
-    return EntityRef(
-        id=name,
-        type=EntityType.DEVELOPER,
-    )
-
-
-def module(
-    name,
-):
-    return EntityRef(
-        id=name,
-        type=EntityType.FILE,
-    )
-
-
-def event():
-    event_id = uuid4()
-
-    return Event(
-        id=event_id,
-        type=EventType.COMMIT,
-        actor_ref=developer(
-            "alice"
-        ),
-        target_refs=(
-            module(
-                "payments.py"
-            ),
-            module(
-                "billing.py"
-            ),
-        ),
-        occurred_at=datetime.now(
-            UTC
-        ),
-        payload={
-            "additions": 40,
-            "deletions": 10,
-            "total_changes": 50,
-            "observation": {
-                "behavioral": {
-                    "commit": {
-                        "files_changed": 2,
-                        "total_additions": 40,
-                        "total_deletions": 10,
-                        "total_changes": 50,
-                    }
-                },
-                "artifact": {
-                    "files": [
-                        {
-                            "filename": "payments.py",
-                            "changes": 35,
-                            "patch": (
-                                "+ if amount > 0:\n"
-                                "+     for item in items:\n"
-                                "- if old_amount:\n"
-                            ),
-                        },
-                        {
-                            "filename": "billing.py",
-                            "changes": 15,
-                            "patch": "+ while retry:\n",
-                        },
-                    ]
-                },
-            },
-        },
-        metadata={
-            "source": "github",
-            "gateway": "rest",
-        },
-    )
-
-
 def main():
-    engine = MeasurementEngine.default()
-
-    context = MeasurementContext(
-        timestamp=datetime.now(
-            UTC
+    commit = obs(
+        "commit-1",
+        ObservationType.COMMIT,
+        ObservationCategory.SOURCE_CONTROL,
+        CommitFacts(
+            commit_id="commit-1",
+            message="Add deterministic SME",
+            author_name="Alice",
+            author_email="alice@example.com",
+            authored_at=datetime(
+                2026,
+                7,
+                1,
+                12,
+                0,
+                tzinfo=UTC,
+            ),
+            total_additions=40,
+            total_deletions=10,
+            total_changes=50,
+            files=(
+                FileChangeFacts(
+                    path="backend/app/measurement/scientific_engine/engine.py",
+                    status="modified",
+                    additions=30,
+                    deletions=8,
+                    changes=38,
+                ),
+                FileChangeFacts(
+                    path="backend/app/measurement/scientific_engine/providers.py",
+                    status="modified",
+                    additions=10,
+                    deletions=2,
+                    changes=12,
+                ),
+            ),
         ),
+        targets=(
+            EntityRef(
+                id="backend/app/measurement/scientific_engine/engine.py",
+                type=EntityType.FILE,
+            ),
+        ),
+    )
+    pull_request = obs(
+        "pr-1",
+        ObservationType.PULL_REQUEST,
+        ObservationCategory.CODE_REVIEW,
+        PullRequestFacts(
+            pull_request_id="pr-1",
+            title="M40",
+            state="merged",
+            author="alice",
+            created_at=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
+            merged_at=datetime(2026, 7, 1, 12, 0, tzinfo=UTC),
+            changed_files=2,
+        ),
+    )
+    review = obs(
+        "review-1",
+        ObservationType.REVIEW,
+        ObservationCategory.CODE_REVIEW,
+        ReviewFacts(
+            review_id="review-1",
+            subject_id="pr-1",
+            reviewer="bob",
+            state="approved",
+            submitted_at=datetime(2026, 7, 1, 11, 0, tzinfo=UTC),
+            comment_count=3,
+        ),
+    )
+    issue = obs(
+        "issue-1",
+        ObservationType.ISSUE,
+        ObservationCategory.PROJECT_MANAGEMENT,
+        IssueFacts(
+            issue_id="issue-1",
+            title="Bug",
+            state="closed",
+            author="alice",
+            created_at=datetime(2026, 7, 1, 9, 0, tzinfo=UTC),
+            closed_at=datetime(2026, 7, 1, 12, 0, tzinfo=UTC),
+            labels=("bug", "m40"),
+        ),
+    )
+    build = obs(
+        "build-1",
+        ObservationType.BUILD,
+        ObservationCategory.CI_CD,
+        BuildFacts(
+            build_id="build-1",
+            status="passed",
+            started_at=datetime(2026, 7, 1, 11, 0, tzinfo=UTC),
+            completed_at=datetime(2026, 7, 1, 11, 5, tzinfo=UTC),
+            duration_seconds=300,
+        ),
+    )
+    test = obs(
+        "test-1",
+        ObservationType.TEST,
+        ObservationCategory.TESTING,
+        TestFacts(
+            test_run_id="test-1",
+            status="passed",
+            started_at=datetime(2026, 7, 1, 11, 5, tzinfo=UTC),
+            failed=0,
+            passed=120,
+        ),
+    )
+    documentation = obs(
+        "doc-1",
+        ObservationType.DOCUMENTATION,
+        ObservationCategory.DOCUMENTATION,
+        DocumentationFacts(
+            document_id="doc-1",
+            path="docs/milestones/milestone_40.md",
+            observed_at=datetime(2026, 7, 1, 12, 0, tzinfo=UTC),
+            state="updated",
+        ),
+    )
+
+    registry = ScientificMeasurementRegistry(
+        default_scientific_measurements()
+    )
+    registry.register(
+        ScientificMeasurementDefinition(
+            id="custom_commit_constant",
+            name="Custom Commit Constant",
+            description="Plugin measurement used by the M40 smoke test.",
+            unit=MeasurementUnit.COUNT,
+            data_type=MeasurementDataType.FLOAT,
+            provider="custom_commit_provider",
+            version="1.0",
+            minimum=0.0,
+        )
+    )
+
+    providers = MeasurementProviderRegistry(
+        (
+            *default_measurement_providers(),
+            CustomCommitProvider(),
+        )
+    )
+    engine = ScientificMeasurementEngine(
+        providers=providers,
+        registry=registry,
+    )
+    context = MeasurementContext(
+        timestamp=datetime.now(UTC),
+        pipeline_version="sme.v1",
         tenant_id="tenant-a",
         source_reliability={
-            "github": 0.95,
-        },
-        metadata={
-            "benchmarks": {
-                "code_churn": [
-                    5,
-                    10,
-                    20,
-                    50,
-                    100,
-                ]
-            }
+            "github": 0.96,
         },
     )
-
-    measurements = engine.measure_event(
-        event(),
+    observations = [
+        commit,
+        pull_request,
+        review,
+        issue,
+        build,
+        test,
+        documentation,
+    ]
+    measurements = engine.measure_observations(
+        observations,
         context,
     )
-
-    assert len(
-        measurements
-    ) == 6
-
-    by_definition = {
+    by_id = {
         measurement.definition.id: measurement
         for measurement in measurements
     }
 
-    assert by_definition[
-        "code_churn"
-    ].value == 50
-
-    assert by_definition[
-        "files_changed"
-    ].value == 2
-
-    assert by_definition[
-        "patch_complexity_delta"
-    ].value == 2
+    assert by_id["lines_added"].value == 40
+    assert by_id["lines_deleted"].value == 10
+    assert by_id["files_modified"].value == 2
+    assert by_id["directories_changed"].value == 1
+    assert by_id["review_latency_seconds"].value == 7200
+    assert by_id["review_count"].value == 1
+    assert by_id["comment_count"].value == 3
+    assert by_id["issue_resolution_seconds"].value == 10800
+    assert by_id["label_count"].value == 2
+    assert by_id["build_duration_seconds"].value == 300
+    assert by_id["test_failures"].value == 0
+    assert by_id["document_path_depth"].value == 3
+    assert by_id["custom_commit_constant"].value == 1
 
     for measurement in measurements:
+        assert measurement.provenance.source_observation_id
+        assert measurement.traceability.evaluator
+        assert measurement.version == "1.0"
         assert measurement.validation_status in {
             ValidationStatus.PASSED,
             ValidationStatus.WARNING,
         }
         assert 0.0 <= measurement.confidence <= 1.0
-        assert 0.0 <= measurement.quality_score <= 1.0
-        assert measurement.provenance.source_event_id is not None
+        assert "provider" in measurement.metadata
+        assert "precision" in measurement.metadata
 
-    derived = DerivedMeasurementEngine().derive(
-        FormulaDefinition(
-            definition=MeasurementDefinition(
-                id="change_risk_index",
-                name="Change Risk Index",
-                description="Risk = churn * attention.",
-                unit=MeasurementUnit.SCORE,
-                version="1.0",
-                minimum=0.0,
-            ),
-            expression="churn * attention",
-            variable_measurement_ids={
-                "churn": by_definition[
-                    "code_churn"
-                ].id,
-                "attention": by_definition[
-                    "review_attention_need"
-                ].id,
-            },
-        ),
-        measurements,
+    repeated = engine.measure_observations(
+        observations,
+        context,
     )
+    assert [
+        measurement.id
+        for measurement in measurements
+    ] == [
+        measurement.id
+        for measurement in repeated
+    ]
 
-    assert derived.dependencies
-    assert derived.traceability.formula == "churn * attention"
-    assert derived.uncertainty.variance > 0
-
-    fused = MultiSourceFusionEngine().fuse(
+    aggregation = MeasurementAggregationEngine()
+    values = [
+        1,
+        2,
+        3,
+        4,
+    ]
+    assert aggregation.sum(values) == 10
+    assert aggregation.mean(values) == 2.5
+    assert aggregation.median(values) == 2.5
+    assert aggregation.min(values) == 1
+    assert aggregation.max(values) == 4
+    assert aggregation.percentile(values, 0.5) in {2, 3}
+    assert aggregation.rolling_mean(values, 2) == [
+        1.0,
+        1.5,
+        2.5,
+        3.5,
+    ]
+    assert aggregation.time_buckets(
         [
-            by_definition[
-                "change_surface_area"
-            ],
-            by_definition[
-                "review_attention_need"
-            ],
-        ]
-    )
-
-    assert fused.dependencies
-    assert fused.metadata[
-        "source_count"
-    ] == 2
-
-    probabilistic = ProbabilisticFusionEngine().fuse(
-        [
-            by_definition[
-                "change_surface_area"
-            ],
-            by_definition[
-                "review_attention_need"
-            ],
-        ]
-    )
-
-    assert probabilistic.uncertainty.method == (
-        "precision_weighted_bayesian_fusion"
-    )
-
-    ontology = MeasurementOntology.default()
-
-    assert ontology.get(
-        "maintainability"
-    ).display_name == "Maintainability"
-
-    registry = DefaultMeasurementCatalog.build()
-
-    assert registry.get(
-        "code_churn"
-    ).concept_id == "change_impact"
-
-    signal_registry = DefaultSignalCatalog.build()
-    signal_definition = signal_registry.get(
-        "git.total_additions"
-    )
-
-    software_signal = SoftwareSignal(
-        id="git.total_additions",
-        name="total_additions",
-        source="github",
-        value=40,
-        unit=MeasurementUnit.LOC,
-        source_event_id="event-1",
-    )
-
-    assert (
-        SignalDefinitionValidator()
-        .validate_value(
-            software_signal,
-            signal_definition,
-        )
-        .status
-        == ValidationStatus.PASSED
-    )
-
-    signal_ontology = SignalOntology.default()
-    classification = SemanticSignalClassifier(
-        signal_registry,
-        signal_ontology,
-    ).classify(
-        software_signal
-    )
-
-    assert classification.category == "source_control"
-
-    mapping_registry = SignalMeasurementMappingRegistry()
-    mapping_registry.register(
-        SignalMeasurementMapping(
-            id="git-additions-to-churn",
-            version="1.0",
-            signal_ids=(
-                "git.total_additions",
-                "git.total_deletions",
+            (
+                commit.timestamp,
+                1.0,
             ),
-            concept_id="change_impact",
-            measurement_definition_ids=(
-                "code_churn",
+            (
+                review.timestamp,
+                2.0,
             ),
-            evaluator="change_complexity_evaluator",
-            cardinality=MappingCardinality.MANY_TO_ONE,
-            confidence=0.95,
-            explanation=(
-                "line additions and deletions compose code churn"
-            ),
-            trace=(
-                "signal_registry",
-                "measurement_registry",
-            ),
-        )
+        ],
+        3600,
     )
 
-    resolution = SignalToMeasurementMapper(
-        registry,
-        mapping_registry,
-    ).resolve(
-        software_signal,
-        classification,
-    )
-
-    assert resolution.definitions[0].id == "code_churn"
-
-    assert (
-        SemanticMappingValidator()
-        .validate(
-            classification,
-            resolution,
-        )
-        .status
-        == ValidationStatus.PASSED
-    )
-
-    standards = StandardsCatalog.default()
-
-    assert standards.get(
-        "ISO-15939"
-    ).organization == "ISO/IEC"
-
-    domain_packs = DefaultDomainPacks.build()
-
-    assert any(
-        pack.id == "code-quality"
-        for pack in domain_packs
-    )
-
-    measurement_knowledge = (
-        DefaultSoftwareMeasurementKnowledge
-        .build()
-    )
-
-    assert measurement_knowledge.get(
-        "code_churn"
-    ).business_definition
-
-    benchmark_registry = BenchmarkDatasetRegistry()
-    benchmark_registry.register(
-        BenchmarkDataset(
-            id="repo-code-churn",
-            measurement_id="code_churn",
-            scope=BenchmarkScope.REPOSITORY,
-            values=(
-                5,
-                10,
-                20,
-                50,
-            ),
-            version="1.0",
-            source="internal",
-            metadata={
-                "repository": "latent-engine",
-            },
-        )
-    )
-
-    knowledge_api = MeasurementKnowledgeApi(
-        signal_registry=signal_registry,
-        measurement_registry=registry,
-        mapping_registry=mapping_registry,
-        signal_ontology=signal_ontology,
-        measurement_knowledge=measurement_knowledge,
-        benchmark_registry=benchmark_registry,
-        standards_catalog=standards,
-    )
-
-    assert knowledge_api.signal_definition(
-        "git.total_additions"
-    ).display_name == "Total Additions"
-    assert knowledge_api.measurement_definition(
-        "code_churn"
-    ).name == "Code Churn"
-    assert knowledge_api.mappings_for_signal(
-        "git.total_additions"
-    )
-    assert knowledge_api.benchmark_metadata(
-        "code_churn"
-    )
-    assert knowledge_api.standards_references()
-
-    enterprise_registry = (
-        EnterpriseMeasurementCatalog
-        .build_registry()
-    )
-    enterprise_knowledge = (
-        EnterpriseMeasurementCatalog
-        .build_knowledge_base()
-    )
-    accuracy_profiles = (
-        EnterpriseMeasurementCatalog
-        .build_accuracy_profiles()
-    )
-
-    assert len(
-        enterprise_registry.all()
-    ) >= 50
-    assert enterprise_knowledge.get(
-        "cyclomatic_complexity"
-    ).scientific_definition
-    assert accuracy_profiles.get(
-        "cyclomatic_complexity"
-    ).minimum_required_signals
-
-    enterprise_benchmarks = BenchmarkDatasetRegistry()
-    enterprise_benchmarks.register(
-        BenchmarkDataset(
-            id="cyclomatic-complexity-language",
-            measurement_id="cyclomatic_complexity",
-            scope=BenchmarkScope.PROGRAMMING_LANGUAGE,
-            values=(
-                4,
-                8,
-                12,
-                20,
-            ),
-            version="1.0",
-            source="synthetic",
-            metadata={
-                "language": "python",
-            },
-        )
-    )
-
-    validation_engine = ScientificValidationEngine(
-        enterprise_knowledge,
-        accuracy_profiles,
-        enterprise_benchmarks,
-    )
-
-    validation_report = (
-        validation_engine
-        .validate_definition(
-            enterprise_registry.get(
-                "cyclomatic_complexity"
-            )
-        )
-    )
-
-    assert validation_report.status in {
-        ValidationStatus.PASSED,
-        ValidationStatus.WARNING,
-    }
-    assert validation_report.mathematical.status in {
-        ValidationStatus.PASSED,
-        ValidationStatus.WARNING,
-    }
-
-    catalog_reports = CatalogValidationService(
-        enterprise_registry,
-        validation_engine,
-    ).validate_all()
-
-    assert len(
-        catalog_reports
-    ) == len(
-        enterprise_registry.all()
-    )
-
-    calibration_report = (
-        ConfidenceCalibrationModel()
-        .calibrate(
-            "cyclomatic_complexity",
-            0.8,
-            [
-                ConfidenceObservation(
-                    measurement_id="cyclomatic_complexity",
-                    predicted_confidence=0.8,
-                    observed_success=True,
-                ),
-                ConfidenceObservation(
-                    measurement_id="cyclomatic_complexity",
-                    predicted_confidence=0.8,
-                    observed_success=False,
-                ),
-            ],
-        )
-    )
-
-    assert calibration_report.sample_size == 2
-    assert calibration_report.calibration_error >= 0
-
-    test_corpus = MeasurementTestCorpus.default()
-
-    assert test_corpus.get(
-        "synthetic_commit_history_small"
-    ).expected_measurements
-
-    scientific_api = ScientificMeasurementApi(
-        validation_engine=validation_engine,
-        benchmark_registry=enterprise_benchmarks,
-        knowledge_base=enterprise_knowledge,
-        accuracy_profiles=accuracy_profiles,
-        standards_catalog=standards,
-    )
-
-    assert scientific_api.benchmark_lookup(
-        "cyclomatic_complexity"
-    )
-    assert scientific_api.interpretation(
-        "cyclomatic_complexity"
-    )
-    assert scientific_api.accuracy_profile(
-        "cyclomatic_complexity"
-    )
-    assert scientific_api.research_references(
-        "cyclomatic_complexity"
-    )
-
-    contract = MeasurementContract(
-        definition=registry.get(
-            "code_churn"
-        ),
-        input_signals=(
-            "total_additions",
-            "total_deletions",
-        ),
-        output_unit=MeasurementUnit.LOC,
-        precision=0.05,
-        confidence_model="default_factor_model",
-        lifecycle=MeasurementLifecycle.PRODUCTION,
-    )
-
-    assert (
-        MeasurementContractValidator()
-        .validate(
-            by_definition[
-                "code_churn"
-            ],
-            contract,
-        )
-        .status
-        == ValidationStatus.PASSED
-    )
-
-    parsed = MeasurementDslParser().parse(
-        """
-        measure Risk
-        from Complexity
-        from Ownership
-        formula Complexity * Ownership
-        confidence Bayesian
-        validator Range
-        normalizer Percentile
-        """
-    )
-
-    definition = MeasurementDslParser().to_definition(
-        parsed
-    )
-
-    assert definition.formula == "Complexity * Ownership"
-    assert definition.confidence_model == "Bayesian"
-
-    lineage = MeasurementLineageService().graph_for(
-        derived
-    )
-
-    assert lineage.nodes
-    assert lineage.edges
-
-    first_node = lineage.nodes[0].id
-    path = MeasurementLineageQueryEngine().show_path(
-        lineage,
-        first_node,
-        derived.id,
-    )
-
-    assert path
-
-    explanation = MeasurementExplainer().explain(
-        derived
-    )
-
-    assert explanation[
-        "formula"
-    ] == "churn * attention"
-
-    store = TemporalMeasurementStore()
-
-    for measurement in measurements:
-        store.append(
-            measurement
-        )
-
-    assert store.history(
-        "code_churn",
-        tuple(
-            by_definition[
-                "code_churn"
-            ].provenance.source_entity_ids
-        ),
-    )
-
-    cache = MeasurementCache()
-    cache.put_hot(
-        by_definition[
-            "code_churn"
-        ]
-    )
-
-    assert cache.get(
-        by_definition[
-            "code_churn"
-        ].id
-    )
+    stats = ScientificStatistics()
+    assert stats.mean(values) == 2.5
+    assert round(stats.variance(values), 5) == 1.66667
+    assert stats.standard_deviation(values) > 0
+    assert stats.entropy(values) > 0
+    assert stats.quantile(values, 0.95) == 4
+    assert stats.histogram(values, 2)
+    assert stats.correlation(values, values) == 1.0
+    assert stats.distribution_analysis(values)["p50"] in {2, 3}
 
     graph = MeasurementDependencyGraph()
     graph.register(
-        derived.id,
-        derived.dependencies,
-    )
-
-    assert graph.affected_by(
-        derived.dependencies[0]
-    ) == {
-        derived.id
-    }
-
-    semantic_graph = SemanticMeasurementGraph()
-    semantic_graph.add(
-        SemanticMeasurementEdge(
-            source_concept_id="maintainability",
-            target_concept_id="complexity",
-            relationship=ConceptRelationship.DEPENDS_ON,
-            confidence=0.95,
-        )
-    )
-
-    assert semantic_graph.neighbors(
-        "maintainability"
-    )
-
-    benchmark = BenchmarkEngine().compare(
-        by_definition[
-            "code_churn"
-        ].value,
-        [
-            5,
-            10,
-            20,
-            50,
-            100,
-        ],
-        "repository",
-    )
-
-    assert benchmark.cohort == "repository"
-
-    report = StatisticsPipeline().analyze(
-        [
-            measurement.value
-            for measurement in measurements
-        ]
-    )
-
-    assert report.distribution in {
-        "approximately_symmetric",
-        "left_skewed",
-        "right_skewed",
-    }
-
-    accuracy_report = EnterpriseAccuracyPipeline().process(
-        measurements,
-        context,
-    )
-
-    assert accuracy_report.measurements
-    assert all(
-        validation.status == ValidationStatus.PASSED
-        for validation in accuracy_report.validations
-    )
-
-    calibrated = MlCalibrationService(
-        DemoCalibrationModel()
-    ).calibrate(
-        by_definition[
-            "code_churn"
-        ]
-    )
-
-    assert calibrated.metadata[
-        "ml_calibration"
-    ][
-        "source_measurement_id"
-    ] == by_definition[
-        "code_churn"
-    ].id
-
-    mql = MqlParser().parse(
-        """
-        SELECT code_churn
-        WHERE confidence > 0.9
-        ORDER BY quality_score
-        """
-    )
-
-    assert MqlEngine().query(
-        measurements,
-        mql,
-    )
-
-    cache = MeasurementCache()
-    node = MeasurementComputationNode(
-        id="code_churn_node",
-        dependencies=(),
-        cache_key=by_definition[
-            "code_churn"
-        ].id,
-        cost=1.0,
-        executor=lambda: by_definition[
-            "code_churn"
-        ],
-    )
-    plan = MeasurementExecutionPlanner().plan(
-        requested_ids=(
-            "code_churn_node",
+        "architectural_complexity",
+        (
+            "cyclomatic_complexity",
+            "complexity_score",
         ),
-        nodes=[
-            node,
-        ],
-        cache=cache,
     )
-    executed = MeasurementExecutor().execute(
-        plan,
-        cache,
+    assert graph.affected_by(
+        "cyclomatic_complexity"
+    ) == {
+        "architectural_complexity",
+    }
+
+    assert engine.last_benchmark.measurement_latency_ms >= 0
+    assert engine.last_benchmark.throughput > 0
+    assert engine.last_benchmark.allocation_count == len(observations)
+
+    platform = PlatformRuntime.create()
+    for module in default_platform_modules():
+        platform.register_module(module)
+    built = platform.build()
+    built.initialize()
+    built.start()
+    platform_engine = built.provider.resolve(
+        ScientificMeasurementEngine
     )
-
-    assert executed[
-        "code_churn_node"
-    ].definition.id == "code_churn"
-
-    chosen = CostBasedMeasurementOptimizer().choose(
+    platform_measurements = platform_engine.measure_observations(
         [
-            CandidateMeasurementPath(
-                id="ast",
-                expected_confidence=0.96,
-                expected_latency_ms=100,
-                expected_cost=2.0,
-            ),
-            CandidateMeasurementPath(
-                id="llm",
-                expected_confidence=0.91,
-                expected_latency_ms=900,
-                expected_cost=20.0,
-            ),
+            commit,
         ],
-        minimum_confidence=0.9,
-        maximum_latency_ms=500,
-    )
-
-    assert chosen.id == "ast"
-
-    marketplace = MeasurementMarketplace()
-    marketplace.publish(
-        MeasurementPack(
-            id="architecture-intelligence",
-            name="Architecture Intelligence",
-            domain="architecture",
-            version="1.0",
-            definitions=(
-                registry.get(
-                    "patch_complexity_delta"
-                ),
-            ),
-        )
-    )
-    marketplace.install(
-        "tenant-a",
-        "architecture-intelligence",
-    )
-
-    assert marketplace.installed(
-        "tenant-a"
-    )
-
-    active_requests = (
-        ActiveMeasurementService()
-        .requests_for_low_confidence(
-            measurement_id="low-confidence",
-            confidence=0.4,
-            required_signals=(
-                "runtime_coverage",
-            ),
-        )
-    )
-
-    assert active_requests
-
-    updates = []
-    streaming = StreamingMeasurementEngine(
-        engine
-    )
-    streaming.subscribe(
-        updates.append
-    )
-    streaming.ingest(
-        event(),
         context,
     )
-
-    assert updates
-
-    sampler = ReservoirSampler(
-        size=3
+    assert platform.modules.startup_order()[:2] == (
+        "observation",
+        "measurement",
     )
-
-    for value in range(10):
-        sampler.add(
-            value
-        )
-
-    assert len(
-        sampler.sample()
-    ) == 3
-
-    histogram = ApproximateHistogramBuilder().build(
-        [
-            measurement.value
-            for measurement in measurements
-        ]
-    )
-
-    assert histogram.counts
+    assert platform_measurements
+    built.shutdown()
 
     print(
-        "\n=== MEASUREMENT ENGINE ===\n"
+        "\n=== SCIENTIFIC MEASUREMENT ENGINE ===\n"
     )
-
     for measurement in measurements:
         print(
             f"{measurement.definition.id:<30}"
-            f"value={measurement.value:<8.2f}"
-            f"confidence={measurement.confidence:.2f} "
-            f"quality={measurement.quality_score:.2f}"
+            f"value={measurement.value:<10.2f}"
+            f"confidence={measurement.confidence:.2f}"
         )
-
     print(
-        "\nMeasurement science platform passed."
+        "\nM40 Scientific Measurement Engine passed."
     )
 
 
 if __name__ == "__main__":
     main()
+

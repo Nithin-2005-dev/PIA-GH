@@ -19,10 +19,55 @@ class MeasurementPlatformModule(BaseModule):
         services: ServiceCollection,
     ) -> None:
         from app.measurement.core.engine import MeasurementEngine
+        from app.measurement.scientific_engine import MeasurementAggregationEngine
+        from app.measurement.scientific_engine import MeasurementBenchmarkRecorder
+        from app.measurement.scientific_engine import MeasurementProviderRegistry
+        from app.measurement.scientific_engine import ScientificMeasurementEngine
+        from app.measurement.scientific_engine import ScientificMeasurementRegistry
+        from app.measurement.scientific_engine import ScientificStatistics
+        from app.measurement.scientific_engine import default_measurement_providers
+        from app.measurement.scientific_engine import default_scientific_measurements
 
         services.add(
             MeasurementEngine,
             lambda _: MeasurementEngine.default(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ScientificMeasurementRegistry,
+            lambda _: ScientificMeasurementRegistry(
+                default_scientific_measurements()
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            MeasurementProviderRegistry,
+            lambda _: MeasurementProviderRegistry(
+                default_measurement_providers()
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ScientificMeasurementEngine,
+            lambda provider: ScientificMeasurementEngine(
+                providers=provider.resolve(MeasurementProviderRegistry),
+                registry=provider.resolve(ScientificMeasurementRegistry),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            MeasurementAggregationEngine,
+            MeasurementAggregationEngine,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ScientificStatistics,
+            ScientificStatistics,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            MeasurementBenchmarkRecorder,
+            MeasurementBenchmarkRecorder,
             scope=ServiceScope.SINGLETON,
         )
 
