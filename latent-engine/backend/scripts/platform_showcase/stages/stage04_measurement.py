@@ -24,7 +24,7 @@ class MeasurementStage(PipelineStage):
             return
 
         started = time.perf_counter()
-        engine = MeasurementEngine.default()
+        engine = context.resolve(MeasurementEngine)
         measurement_context = MeasurementContext(
             timestamp=datetime.now(UTC),
             tenant_id=context.tenant_id,

@@ -20,10 +20,15 @@ from app.platform.core_modules import ExecutivePlatformModule
 from app.platform.core_modules import ForecastingPlatformModule
 from app.platform.core_modules import GraphPlatformModule
 from app.platform.core_modules import IntelligencePlatformModule
+from app.platform.core_modules import GitHubAdapterFactory
+from app.platform.core_modules import KnowledgePlatformModule
 from app.platform.core_modules import MeasurementPlatformModule
 from app.platform.core_modules import ObservationPlatformModule
 from app.platform.core_modules import SimulationPlatformModule
 from app.platform.core_modules import default_platform_modules
+from app.platform.api.contracts import RuntimePipelineInput
+from app.platform.api.contracts import RuntimePipelineResult
+from app.platform.api.contracts import RuntimeStageExecution
 from app.platform.di import ServiceCollection
 from app.platform.di import ServiceProvider
 from app.platform.di import ServiceScope

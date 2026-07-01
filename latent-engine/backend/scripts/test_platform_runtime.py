@@ -378,11 +378,13 @@ def main():
         "measurement",
         "evidence",
         "estimation",
+        "knowledge",
         "graph",
+        "intelligence",
         "forecasting",
         "simulation",
-        "decision",
         "agent",
+        "decision",
         "executive",
     )
     assert default_runtime.modules.providers_for(

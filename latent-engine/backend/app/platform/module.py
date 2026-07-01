@@ -156,6 +156,12 @@ class ModuleRegistry:
     ) -> tuple[PlatformModule, ...]:
         return tuple(self._modules.values())
 
+    def has(
+        self,
+        name: str,
+    ) -> bool:
+        return name in self._modules
+
     def get(
         self,
         name: str,
@@ -228,4 +234,3 @@ class ModuleRegistry:
                 self.startup_order()
             )
         )
-

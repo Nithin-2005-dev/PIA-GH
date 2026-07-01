@@ -136,6 +136,8 @@ class IntelligenceContext:
         self.projection = projection
         self.runtime = PlatformRuntime.create()
         for module in default_platform_modules():
+            if module.name == "intelligence":
+                continue
             self.runtime.register_module(module)
         self.runtime.register_module(
             IntelligencePlatformModule(

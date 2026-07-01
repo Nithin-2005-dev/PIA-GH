@@ -7,8 +7,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Mapping
 
-from app.adapters.github.adapter import GitHubAdapter
-from app.adapters.github.rest_gateway import GitHubRestGateway
+from app.platform.core_modules import GitHubAdapterFactory
 
 from ..context import PlatformContext
 from ..ui import metric, ranking, section, success
@@ -32,8 +31,7 @@ class CollectionStage(PipelineStage):
                 "GITHUB_TOKEN or GH_TOKEN is required for the real GitHub pipeline."
             )
 
-        gateway = GitHubRestGateway(token=token)
-        adapter = GitHubAdapter(gateway=gateway)
+        adapter = context.resolve(GitHubAdapterFactory).create(token)
         query = GitHubCollectionQuery(
             identifier=context.repository,
             filters={

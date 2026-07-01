@@ -71,7 +71,7 @@ class InitializeStage(PipelineStage):
 
         metric(
             "Architecture",
-            "Observation -> Measurement -> Evidence -> Expertise -> Knowledge -> Reasoning -> Decision",
+            "Observation -> Measurement -> Evidence -> Expertise -> Knowledge -> Knowledge Graph -> Organization Intelligence -> Reasoning -> Decision",
         )
 
         metric("Repository", context.repository)
@@ -167,6 +167,10 @@ class InitializeStage(PipelineStage):
             "Evidence-to-Expertise Handoff",
 
             "Knowledge Modeling",
+
+            "Knowledge Graph Construction",
+
+            "Organization Intelligence",
 
             "Reasoning Results",
 

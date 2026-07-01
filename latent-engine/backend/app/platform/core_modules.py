@@ -5,6 +5,19 @@ from app.platform.di import ServiceScope
 from app.platform.module import BaseModule
 
 
+class GitHubAdapterFactory:
+    def create(
+        self,
+        token: str,
+    ):
+        from app.adapters.github.adapter import GitHubAdapter
+        from app.adapters.github.rest_gateway import GitHubRestGateway
+
+        return GitHubAdapter(
+            gateway=GitHubRestGateway(token=token)
+        )
+
+
 class MeasurementPlatformModule(BaseModule):
     name = "measurement"
     version = "1.0"
@@ -168,6 +181,11 @@ class ObservationPlatformModule(BaseModule):
             ),
             scope=ServiceScope.SINGLETON,
         )
+        services.add(
+            GitHubAdapterFactory,
+            lambda _: GitHubAdapterFactory(),
+            scope=ServiceScope.SINGLETON,
+        )
 
     def _adapter_registry(
         self,
@@ -252,7 +270,7 @@ class EstimationPlatformModule(BaseModule):
 class GraphPlatformModule(BaseModule):
     name = "graph"
     version = "1.0"
-    dependencies = ("estimation",)
+    dependencies = ("knowledge",)
     capabilities = (
         "graph.organization",
         "graph.knowledge",
@@ -286,6 +304,16 @@ class GraphPlatformModule(BaseModule):
             ),
             scope=ServiceScope.SINGLETON,
         )
+
+
+class KnowledgePlatformModule(BaseModule):
+    name = "knowledge"
+    version = "1.0"
+    dependencies = ("estimation",)
+    capabilities = (
+        "knowledge.model",
+        "knowledge.contract",
+    )
 
 
 class ForecastingPlatformModule(BaseModule):
@@ -355,7 +383,7 @@ class AgentPlatformModule(BaseModule):
     dependencies = (
         "graph",
         "simulation",
-        "decision",
+        "intelligence",
     )
     capabilities = (
         "agent.reasoning",
@@ -417,7 +445,7 @@ class DecisionPlatformModule(BaseModule):
     name = "decision"
     version = "1.0"
     dependencies = (
-        "graph",
+        "agent",
         "forecasting",
         "simulation",
     )
@@ -443,8 +471,7 @@ class IntelligencePlatformModule(BaseModule):
     name = "intelligence"
     version = "1.0"
     dependencies = (
-        "estimation",
-        "forecasting",
+        "graph",
     )
     capabilities = (
         "intelligence.context",
@@ -454,7 +481,7 @@ class IntelligencePlatformModule(BaseModule):
 
     def __init__(
         self,
-        projection,
+        projection=None,
         context=None,
     ):
         self._projection = projection
@@ -496,10 +523,11 @@ class IntelligencePlatformModule(BaseModule):
         from app.successor.policies.expertise_successor_policy import ExpertiseSuccessorPolicy
         from app.successor.successor_service import SuccessorService
 
-        services.add_instance(
-            ExpertiseProjection,
-            self._projection,
-        )
+        if self._projection is not None:
+            services.add_instance(
+                ExpertiseProjection,
+                self._projection,
+            )
         if self._context is not None:
             services.add_instance(
                 IntelligenceContext,
@@ -702,10 +730,12 @@ def default_platform_modules(
         MeasurementPlatformModule(),
         EvidencePlatformModule(),
         EstimationPlatformModule(),
+        KnowledgePlatformModule(),
         GraphPlatformModule(),
+        IntelligencePlatformModule(),
         ForecastingPlatformModule(),
         SimulationPlatformModule(),
-        DecisionPlatformModule(),
         AgentPlatformModule(),
+        DecisionPlatformModule(),
         ExecutivePlatformModule(),
     )

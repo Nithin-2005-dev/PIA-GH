@@ -22,7 +22,7 @@ class EvidenceStage(PipelineStage):
             return
 
         started = time.perf_counter()
-        engine = EvidenceSynthesisEngine()
+        engine = context.resolve(EvidenceSynthesisEngine)
         evidence_context = EvidenceContext(
             tenant_id=context.tenant_id,
             metadata={"repository": context.repository},

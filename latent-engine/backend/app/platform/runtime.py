@@ -4,6 +4,10 @@ from dataclasses import dataclass
 
 from app.platform.config import Configuration
 from app.platform.config import ConfigurationProvider
+from app.platform.api.contracts import RuntimePipelineInput
+from app.platform.api.contracts import RuntimePipelineResult
+from app.platform.canonical_pipeline import CanonicalPlatformPipeline
+from app.platform.core_modules import default_platform_modules
 from app.platform.di import ServiceCollection
 from app.platform.event_bus import EventBus
 from app.platform.health import HealthRegistry
@@ -63,6 +67,13 @@ class PlatformRuntime:
             },
         )
 
+    def register_default_modules(
+        self,
+    ) -> None:
+        for module in default_platform_modules():
+            if not self.modules.has(module.name):
+                self.register_module(module)
+
     def build(
         self,
     ) -> "BuiltPlatformRuntime":
@@ -75,6 +86,33 @@ class PlatformRuntime:
             health=health,
             lifecycle=lifecycle,
         )
+
+    def run(
+        self,
+        repository: str,
+        commits: int = 100,
+        branch: str = "main",
+        github_token: str | None = None,
+        tenant_id: str = "default",
+        output_directory=None,
+    ) -> RuntimePipelineResult:
+        self.register_default_modules()
+        built = self.build()
+        built.initialize()
+        built.start()
+        try:
+            return CanonicalPlatformPipeline(built).run(
+                RuntimePipelineInput(
+                    repository=repository,
+                    branch=branch,
+                    commits=commits,
+                    github_token=github_token,
+                    tenant_id=tenant_id,
+                    output_directory=output_directory,
+                )
+            )
+        finally:
+            built.shutdown()
 
 
 @dataclass
@@ -99,4 +137,3 @@ class BuiltPlatformRuntime:
     ) -> None:
         self.lifecycle.stop()
         self.lifecycle.shutdown()
-

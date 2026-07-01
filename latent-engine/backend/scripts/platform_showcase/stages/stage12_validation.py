@@ -9,24 +9,60 @@ from ..context import PlatformContext
 from ..ui import metric, section, success
 from .base import PipelineStage
 
+# ---------------------------------------------------------------------------
+# Canonical module-name → human-readable display-name mapping.
+# This is the single authoritative map; stage names that appear in
+# execution_stage_names are used directly (they already carry the right label
+# from each stage class).  This dict is only a fallback for the header step
+# that must be inferred from the raw module name in execution_order.
+# ---------------------------------------------------------------------------
+_MODULE_DISPLAY_NAMES: dict[str, str] = {
+    "observation":  "Observation",
+    "measurement":  "Measurement",
+    "evidence":     "Evidence",
+    "estimation":   "Expertise",
+    "knowledge":    "Knowledge",
+    "graph":        "Knowledge Graph",
+    "intelligence": "Organization Intelligence",
+    "agent":        "Reasoning",
+    "decision":     "Decision",
+    "executive":    "Executive Dashboard",
+}
+
 
 class PipelineValidationStage(PipelineStage):
     name = "Pipeline Validation"
 
     def execute(self, context: PlatformContext) -> None:
         section("Actual Execution Path")
-        path = [
-            "GitHub Commit",
-            "Observation",
-            "Measurement",
-            "Evidence",
-            "Expertise",
-            "Knowledge",
-            "Organization Intelligence",
-            "Reasoning",
-            "Decision",
-            "Executive Dashboard",
-        ]
+
+        # ----------------------------------------------------------------
+        # Derive the canonical path from the runtime execution plan that was
+        # stored in context.metrics by CanonicalPlatformPipeline.run() BEFORE
+        # any stage executed.  This guarantees the reported path always matches
+        # what the runtime actually scheduled — no hand-maintained list.
+        # ----------------------------------------------------------------
+        stage_names: tuple[str, ...] = context.metrics.get(
+            "execution_stage_names", ()
+        )
+        if stage_names:
+            # Deduplicate while preserving insertion order (a module may
+            # contribute several stage bindings; show each stage's name once).
+            seen: set[str] = set()
+            path: list[str] = ["GitHub Commit"]
+            for name in stage_names:
+                if name not in seen:
+                    seen.add(name)
+                    path.append(name)
+        else:
+            # Fallback: derive from execution_order module names via the
+            # display-name map.  Covers the synthetic test context that does
+            # not go through CanonicalPlatformPipeline.
+            order: tuple[str, ...] = context.metrics.get("execution_order", ())
+            path = ["GitHub Commit"] + [
+                _MODULE_DISPLAY_NAMES.get(m, m) for m in dict.fromkeys(order)
+            ]
+
         for index, name in enumerate(path):
             metric(f"Step {index + 1}", name)
 
@@ -39,6 +75,7 @@ class PipelineValidationStage(PipelineStage):
             "Evidence":                  bool(package and package.evidence),
             "Expertise":                 bool(context.expertise_models),
             "Knowledge":                 bool(context.knowledge),
+            "Knowledge Graph":           context.knowledge_graph is not None,
             "Organization Intelligence": org is not None,
             "Reasoning":                 bool(context.reasoning_results),
             "Decision":                  bool(context.decisions),
@@ -50,6 +87,7 @@ class PipelineValidationStage(PipelineStage):
             "Immutability":              self._immutability_preserved(context),
             "Org No Legacy Deps":        self._no_legacy_deps(org),
         }
+
 
         for name, passed in checks.items():
             metric(name, "PASS" if passed else "FAIL")

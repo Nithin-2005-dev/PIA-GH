@@ -761,11 +761,23 @@ class OrganizationIntelligenceStage(PipelineStage):
             warning("No Knowledge Graph available — skipping Organization Intelligence")
             return
 
-        # Query the graph for expertise nodes
-        expertise_nodes = [
-            data for _, data in graph.nodes(data=True)
-            if data.get("type") == "expertise"
-        ]
+        # Query the canonical graph service shape. NetworkX is tolerated only
+        # for historical replay files; new runtime execution produces
+        # app.graph.organizational_graph.OrganizationalGraph.
+        if hasattr(graph, "nodes") and isinstance(graph.nodes, list):
+            expertise_nodes = [
+                {
+                    "type": node.type,
+                    **(node.attributes or {}),
+                }
+                for node in graph.nodes
+                if node.type == "expertise"
+            ]
+        else:
+            expertise_nodes = [
+                data for _, data in graph.nodes(data=True)
+                if data.get("type") == "expertise"
+            ]
 
         # Reconstruct the proxy objects from the graph nodes instead of directly from ExpertiseModels
         proxies = [

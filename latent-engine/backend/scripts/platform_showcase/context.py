@@ -219,6 +219,16 @@ class PlatformContext:
     metrics: dict[str, Any] = field(default_factory=dict)
     timings: dict[str, StageTiming] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    runtime: Any | None = None
+    service_provider: Any | None = None
+
+    def resolve(
+        self,
+        service,
+    ):
+        if self.service_provider is None:
+            raise RuntimeError("Platform Runtime service provider is not attached")
+        return self.service_provider.resolve(service)
 
     def stage(self, name: str) -> StageTiming:
         if name not in self.timings:

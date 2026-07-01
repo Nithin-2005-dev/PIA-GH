@@ -1,36 +1,50 @@
 # Current PIA Architecture
 
+> **Last updated: M51b** — canonical pipeline extended to include Knowledge
+> Graph as a first-class runtime stage.
+
 ## Canonical Flow
 
 ```text
-Software Events
-    |
-    v
-Vendor Adapter
-    |
-    v
+GitHub Commit
+     |
+     v
 Observation Layer
-    |
-    v
-Measurement Operating System
-    |
-    v
-Evidence Intelligence Platform
-    |
-    v
+     |
+     v
+Measurement Layer
+     |
+     v
+Evidence Layer
+     |
+     v
 Expertise Layer
-    |
-    v
+     |
+     v
+Knowledge Layer
+     |
+     v
+Knowledge Graph Layer       ← graph module; depends on knowledge
+     |
+     v
+Organization Intelligence   ← intelligence module; depends on graph
+     |
+     v
 Reasoning Layer
-    |
-    v
+     |
+     v
 Decision Layer
+     |
+     v
+Executive Intelligence Report
 ```
 
 Short form:
 
 ```text
-Observation -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
+GitHub → Observation → Measurement → Evidence → Expertise →
+Knowledge → Knowledge Graph → Organization Intelligence →
+Reasoning → Decision → Executive Intelligence
 ```
 
 ## Contract Rule

@@ -86,3 +86,119 @@ class KnowledgeGraphBuilder:
             edges=edges,
         )
 
+    def build_from_models(
+        self,
+        knowledge_models,
+        expertise_models,
+        evidence_package: EvidencePackage | None = None,
+    ) -> OrganizationalGraph:
+        nodes: dict[str, GraphNode] = {}
+        edges: list[GraphEdge] = []
+
+        for model in knowledge_models:
+            nodes[model.id] = GraphNode(
+                id=model.id,
+                type="knowledge",
+                attributes={
+                    "entity_type": model.entity_type,
+                    "topic": model.topic,
+                    "score": model.average_score,
+                    "confidence": model.average_confidence,
+                },
+            )
+
+        for model in expertise_models:
+            entity_type = (
+                "subsystem"
+                if model.category == "module"
+                else model.category
+            )
+            nodes[model.id] = GraphNode(
+                id=model.id,
+                type="expertise",
+                attributes={
+                    "subject": model.subject,
+                    "category": model.category,
+                    "entity_type": entity_type,
+                    "score": model.score,
+                    "confidence": model.confidence,
+                },
+            )
+            for evidence_id in model.evidence_ids:
+                nodes.setdefault(
+                    evidence_id,
+                    GraphNode(
+                        id=evidence_id,
+                        type="evidence",
+                    ),
+                )
+                edges.append(
+                    GraphEdge(
+                        source_id=evidence_id,
+                        target_id=model.id,
+                        relationship="SUPPORTS_EXPERTISE",
+                        weight=model.confidence,
+                    )
+                )
+
+        if evidence_package is not None:
+            for evidence in evidence_package.evidence:
+                evidence_id = str(evidence.evidence_id)
+                nodes.setdefault(
+                    evidence_id,
+                    GraphNode(
+                        id=evidence_id,
+                        type="evidence",
+                        attributes={
+                            "name": evidence.name,
+                            "confidence": evidence.confidence,
+                        },
+                    ),
+                )
+                for measurement_id in evidence.lineage.source_measurement_ids:
+                    nodes.setdefault(
+                        measurement_id,
+                        GraphNode(
+                            id=measurement_id,
+                            type="measurement",
+                        ),
+                    )
+                    edges.append(
+                        GraphEdge(
+                            source_id=measurement_id,
+                            target_id=evidence_id,
+                            relationship="SUPPORTS_EVIDENCE",
+                            weight=evidence.confidence,
+                        )
+                    )
+
+        knowledge_nodes = [
+            node
+            for node in nodes.values()
+            if node.type == "knowledge"
+        ]
+        for model in expertise_models:
+            entity_type = (
+                "subsystem"
+                if model.category == "module"
+                else model.category
+            )
+            for node in knowledge_nodes:
+                attributes = node.attributes or {}
+                if (
+                    attributes.get("entity_type") == entity_type
+                    and attributes.get("topic") == model.subject
+                ):
+                    edges.append(
+                        GraphEdge(
+                            source_id=model.id,
+                            target_id=node.id,
+                            relationship="SUPPORTS_KNOWLEDGE",
+                            weight=model.confidence,
+                        )
+                    )
+
+        return OrganizationalGraph(
+            nodes=list(nodes.values()),
+            edges=edges,
+        )
