@@ -177,6 +177,7 @@ class CanonicalPlatformPipeline:
         from scripts.platform_showcase.stages.stage07_knowledge import KnowledgeStage
         from scripts.platform_showcase.stages.stage07b_graph import KnowledgeGraphStage
         from scripts.platform_showcase.stages.stage07c_temporal import TemporalIntelligenceStage
+        from scripts.platform_showcase.stages.stage07d_forecast import ForecastingStage
         from scripts.platform_showcase.stages.stage08_org_intelligence import OrganizationIntelligenceStage
         from scripts.platform_showcase.stages.stage09_reasoning import ReasoningStage
         from scripts.platform_showcase.stages.stage10_decision import DecisionStage
@@ -253,11 +254,19 @@ class CanonicalPlatformPipeline:
                     "PlatformContext.historical_context",
                 ),
             ),
+            "forecast": (
+                CanonicalStageBinding(
+                    "forecast",
+                    ForecastingStage(),
+                    "PlatformContext.historical_context",
+                    "PlatformContext.forecast_context",
+                ),
+            ),
             "intelligence": (
                 CanonicalStageBinding(
                     "intelligence",
                     OrganizationIntelligenceStage(),
-                    "PlatformContext.historical_context",
+                    "PlatformContext.forecast_context",
                     "PlatformContext.org_intelligence",
                 ),
             ),

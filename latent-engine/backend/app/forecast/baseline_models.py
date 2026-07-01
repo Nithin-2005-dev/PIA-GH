@@ -38,10 +38,8 @@ class ConstantBaselineModel:
         current = series.current
         
         predictions = []
-        now = datetime.datetime.now()
-        
         for horizon in horizons:
-            proj_date = (now + datetime.timedelta(days=horizon)).isoformat()
+            proj_date = f"T+{horizon}d"
             predictions.append(
                 ForecastPoint(
                     horizon_days=horizon,
@@ -118,10 +116,8 @@ class LinearTrendModel:
         variance = sum(r * r for r in residuals) / n
 
         predictions = []
-        now = datetime.datetime.now()
-        
         for horizon in horizons:
-            proj_date = (now + datetime.timedelta(days=horizon)).isoformat()
+            proj_date = f"T+{horizon}d"
             
             # Since our x-axis is just snapshot index, we map horizon days to indices roughly.
             # Assuming 1 snapshot per day for this simple model, x_proj = n - 1 + horizon.
@@ -196,10 +192,8 @@ class MovingAverageModel:
         variance = sum((p - ma)**2 for p in recent_points) / len(recent_points)
 
         predictions = []
-        now = datetime.datetime.now()
-        
         for horizon in horizons:
-            proj_date = (now + datetime.timedelta(days=horizon)).isoformat()
+            proj_date = f"T+{horizon}d"
             std_dev = math.sqrt(variance) * (1.0 + horizon / 30.0)
             predictions.append(
                 ForecastPoint(
@@ -213,11 +207,13 @@ class MovingAverageModel:
                 )
             )
 
+        confidence_score = min(0.9, max(0.1, 1.0 - (variance / (abs(ma) + 1e-5))))
+
         return ForecastSeries(
             metric_name=series.metric_name,
             current_value=series.current,
             predictions=tuple(predictions),
-            confidence=ForecastConfidence(score=0.6),
+            confidence=ForecastConfidence(score=confidence_score),
             uncertainty=ForecastUncertainty(variance=variance),
             explanation=ForecastExplanation(
                 rationale=f"Moving average over last {window} snapshots.",
@@ -267,13 +263,11 @@ class MomentumProjectionModel:
         dampening = 0.9
 
         predictions = []
-        now = datetime.datetime.now()
-        
         current_val = y[-1]
         current_vel = v2
         
         for horizon in horizons:
-            proj_date = (now + datetime.timedelta(days=horizon)).isoformat()
+            proj_date = f"T+{horizon}d"
             
             # Integrate over horizon days
             # Assuming 1 snapshot ≈ 1 day for this simple model
@@ -299,12 +293,15 @@ class MomentumProjectionModel:
                 )
             )
 
+        variance = abs(acceleration)
+        confidence_score = min(0.9, max(0.1, 1.0 - (variance / (abs(current_vel) + 1e-5))))
+
         return ForecastSeries(
             metric_name=series.metric_name,
             current_value=series.current,
             predictions=tuple(predictions),
-            confidence=ForecastConfidence(score=0.7),
-            uncertainty=ForecastUncertainty(variance=abs(acceleration)),
+            confidence=ForecastConfidence(score=confidence_score),
+            uncertainty=ForecastUncertainty(variance=variance),
             explanation=ForecastExplanation(
                 rationale="Kinematic projection using velocity and acceleration.",
                 assumptions=("Inertia persists", "Acceleration dampens over time"),
@@ -344,10 +341,8 @@ class ExponentialSmoothingModel:
             s = alpha * p.value + (1 - alpha) * s
             
         predictions = []
-        now = datetime.datetime.now()
-        
         for horizon in horizons:
-            proj_date = (now + datetime.timedelta(days=horizon)).isoformat()
+            proj_date = f"T+{horizon}d"
             std_dev = abs(s * 0.05) * (1.0 + horizon / 30.0)
             
             predictions.append(
@@ -362,12 +357,15 @@ class ExponentialSmoothingModel:
                 )
             )
 
+        variance = abs(series.current - s)
+        confidence_score = min(0.9, max(0.1, 1.0 - (variance / (abs(s) + 1e-5))))
+
         return ForecastSeries(
             metric_name=series.metric_name,
             current_value=series.current,
             predictions=tuple(predictions),
-            confidence=ForecastConfidence(score=0.65),
-            uncertainty=ForecastUncertainty(variance=abs(series.current - s)),
+            confidence=ForecastConfidence(score=confidence_score),
+            uncertainty=ForecastUncertainty(variance=variance),
             explanation=ForecastExplanation(
                 rationale="Exponential smoothing (EMA).",
                 assumptions=("Recent points have exponentially more weight",),

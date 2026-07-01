@@ -22,7 +22,7 @@ class PlatformPipeline:
 
         progress = {
             "index": 0,
-            "total": 15,
+            "total": 16,
         }
 
         def show_progress(event):

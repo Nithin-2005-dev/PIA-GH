@@ -46,7 +46,11 @@ class SummaryStage(PipelineStage):
             metric("Healthy Topics",      org.health.healthy_count)
             metric("Warning Topics",      org.health.warning_count)
             metric("Critical Topics",     org.health.critical_count)
-            metric("Forecast",            "UNAVAILABLE (single snapshot)")
+            fc = context.forecast_context
+            if fc and fc.metrics:
+                metric("Forecast",            f"Computed ({len(fc.metrics)} metrics)")
+            else:
+                metric("Forecast",            "UNAVAILABLE (pending history)")
             metric("Recommendations",     len(org.recommendations))
 
             # Validation matrix pass / fail summary

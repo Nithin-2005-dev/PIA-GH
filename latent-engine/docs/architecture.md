@@ -2,116 +2,113 @@
 
 ## Canonical Pipeline
 
-The platform architecture is now:
+The platform architecture established through M51-M53 is now completely unified. The canonical runtime dependency pipeline is:
 
 ```text
-Software Events
+GitHub / Git / Jira / Adapters
     |
     v
-Vendor Adapter
+ Observation Layer
     |
     v
-Observation Layer
+ Measurement Layer
     |
     v
-Measurement Operating System
+ Evidence Layer
     |
     v
-Evidence Intelligence Platform
+ Expertise Layer
     |
     v
-Expertise Layer
+ Knowledge Layer
     |
     v
-Reasoning Layer
+ Knowledge Graph Layer
     |
     v
-Decision Layer
-```
-
-Conceptually:
-
-```text
-Observation -> Measurement -> Evidence -> Expertise -> Reasoning -> Decision
+ Temporal Intelligence Layer
+    |
+    v
+ Predictive Forecasting Layer
+    |
+    v
+ Organization Intelligence Layer
+    |
+    v
+ Reasoning Layer
+    |
+    v
+ Decision Layer
+    |
+    v
+ Executive Intelligence
 ```
 
 ## Layer Responsibilities
 
-- Vendor adapters fetch platform data and translate it into observations.
-- Observation preserves immutable, vendor-neutral canonical facts.
-- Measurement quantifies reality with deterministic, validated, unit-aware
-  values.
-- Evidence synthesizes and validates conclusions from measurements.
-- Expertise applies domain knowledge and best practices to evidence.
-- Reasoning combines expert knowledge into coherent analyses.
-- Decisions recommend actions based on reasoning.
+- **Observation**: Preserves immutable, vendor-neutral canonical facts (e.g. commits, PRs, issues).
+- **Measurement**: Quantifies reality with deterministic, validated, unit-aware values (e.g., SLOC, churn).
+- **Evidence**: Synthesizes and validates conclusions from measurements.
+- **Expertise**: Applies domain knowledge to assign confidence, scores, and developer ownership profiles.
+- **Knowledge**: Synthesizes expertise profiles into high-level organizational knowledge models.
+- **Knowledge Graph**: Materializes a semantic representation of the organization (developers, modules, expertise, risks) using NetworkX.
+- **Temporal Intelligence**: Stores and compares graphs across time, computing historical trends (Velocity, Acceleration, Momentum, Delta) and saving immutable snapshots.
+- **Predictive Forecasting**: Projects temporal trends into the future (7, 30, 90 days) using deterministic models (Linear, EMA, Kinematic) mapped via `ForecastRegistry`.
+- **Organization Intelligence**: Analyzes the organization's current and projected health, including Coverage, Concentration, Bus Factor, Successor readiness, and Knowledge Risks.
+- **Reasoning**: Combines analytical signals into coherent natural language analysis using autonomous agentic frameworks.
+- **Decision**: Translates reasoning output into structured, prioritized organizational actions.
+- **Executive**: Renders a rich summary and dashboard of the final pipeline state.
 
-Observation does not calculate measurements, infer evidence, estimate
-confidence, assign risk, normalize business meaning, or reason.
+## Core Architectural Principles
 
-## Evidence Boundary
+### 1. Inversion of Control & Dependency Injection
+The platform operates through a `ServiceCollection` and `ServiceProvider`. Legacy ad-hoc scripts have been fully replaced by `PlatformContext` and modular services instantiated through `app.bootstrap.intelligence_context`. 
 
-The Evidence Intelligence Platform is the exclusive bridge between the
-Measurement Operating System and the Expertise Layer.
+### 2. Immutability
+`HistoricalContext`, `TemporalSnapshot`, and all core domain objects are deeply immutable. Mutations are rejected. To change state, a new snapshot is generated.
 
-The Expertise Layer must never directly consume observations or measurements.
-It receives only validated `Evidence` objects from an `EvidencePackage`.
+### 3. Absolute Determinism (Forecasting)
+Predictions are mathematical derivatives of the `HistoricalContext`. All non-deterministic factors (like `datetime.now()`) are removed to guarantee exact reproducibility of `ForecastContext` bounds and intervals across successive engine replays.
 
-The Evidence layer must never calculate measurements. It consumes only
-Measurement Layer outputs that have passed validation or warning gates, then
-discovers, validates, correlates, ranks, and explains evidence.
-
-## High-Level Sequence
-
-```mermaid
-sequenceDiagram
-  participant Event as Software Event
-  participant Adapter as Vendor Adapter
-  participant Observation as Observation Layer
-  participant Measurement as Measurement Operating System
-  participant Evidence as Evidence Intelligence Platform
-  participant Expertise as Expertise Layer
-  participant Reasoning as Reasoning Layer
-  participant Decision as Decision Layer
-
-  Event->>Adapter: vendor payload
-  Adapter->>Observation: canonical observation
-  Observation->>Observation: validate and append
-  Observation->>Measurement: Observation
-  Measurement->>Measurement: quantify, validate, score confidence
-  Measurement->>Evidence: validated measurements only
-  Evidence->>Evidence: synthesize, correlate, validate, rank
-  Evidence->>Expertise: EvidencePackage.for_expertise()
-  Expertise->>Reasoning: expert conclusions over evidence
-  Reasoning->>Decision: coherent analysis
-  Decision-->>Event: recommended action
-```
+### 4. Semantic Provenance
+Every output in the pipeline explicitly lists its origins. Evidence IDs are passed into Expertise, which pass into Knowledge. Forecasts carry strict `ForecastProvenance`, explaining the model employed, variance, and confidence scores. No "black box" decisions are permitted.
 
 ## Package Map
 
 ```text
+backend/app/platform
+  Canonical DI pipeline orchestration, stage bindings, and service bootstrapping
+
 backend/app/observation
-  canonical observation platform, registry, ontology, validation and store
+  Canonical observation platform, registry, ontology, validation and store
 
 backend/app/measurement
-  deterministic measurement operating system
+  Deterministic measurement operating system
 
 backend/app/evidence
-  production-grade evidence intelligence platform
+  Production-grade evidence intelligence platform
 
-backend/app/expertise_mapping, backend/app/estimator
-  expertise derivation from evidence and historical knowledge
+backend/app/expertise
+  Expertise derivation from evidence and historical knowledge
 
-backend/app/agent
-  reasoning and user-facing analysis orchestration
+backend/app/knowledge
+  Organizational knowledge abstraction and categorization
 
-backend/app/decision, backend/app/executive
-  decision recommendations and planning
+backend/app/graph
+  Semantic Knowledge Graph generation
+
+backend/app/temporal
+  Immutable historical snapshots and trend derivations
+
+backend/app/forecast
+  Deterministic predictive engine and TimeSeries models
+
+backend/app/org_intelligence
+  Organizational health, bus factor, coverage, and risk assessments
+
+backend/app/agent & backend/app/reasoning
+  Reasoning and user-facing analysis orchestration
+
+backend/app/decision & backend/app/executive
+  Decision recommendations, planning, and dashboarding
 ```
-
-## Backward Compatibility
-
-Earlier milestones used `domain.Event` as the primary source abstraction. That
-object remains for legacy flows only. M36 introduces
-`app.observation.domain.Observation` as the production object consumed by the
-Measurement Operating System.

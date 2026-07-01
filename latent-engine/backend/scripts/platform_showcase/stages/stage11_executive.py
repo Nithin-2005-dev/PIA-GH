@@ -55,7 +55,29 @@ class ExecutiveDashboardStage(PipelineStage):
             bf1 = sum(1 for b in org.bus_factors if b.bus_factor == 1)
             metric("Bus Factor = 1 Topics", bf1)
 
-            metric("Forecast", "UNAVAILABLE (single snapshot)")
+            fc = context.forecast_context
+            if fc and fc.metrics:
+                section("Predictive Forecasting Summary")
+                for m_name, series in fc.metrics.items():
+                    print(f"  --- {m_name.replace('_', ' ').title()} ---")
+                    
+                    hist = context.historical_context
+                    if hist and hist.trends:
+                        # Grab trend details if available
+                        trend = next((t for t in hist.trends if t.metric_name == m_name), None)
+                        if trend:
+                            metric("Current", f"{series.current_value:.2f}")
+                            metric("Trend", trend.direction)
+                            metric("Velocity", f"{trend.velocity:+.2f}")
+                            metric("Momentum", f"{trend.momentum:+.2f}")
+                    
+                    f30 = series.get_forecast(30)
+                    if f30:
+                        metric("30-Day Forecast", f"{f30.predicted_value:.2f}")
+                        metric("Prediction Interval", f"[{f30.interval.lower_bound:.2f}, {f30.interval.upper_bound:.2f}]")
+                        metric("Confidence", f"{series.confidence.score * 100:.1f}%")
+            else:
+                metric("Forecast", "UNAVAILABLE (pending history)")
 
             exec_recs = [r for r in org.recommendations if r.action_type == "executive"]
             if exec_recs:

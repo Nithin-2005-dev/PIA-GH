@@ -805,11 +805,13 @@ class OrganizationIntelligenceStage(PipelineStage):
         health        = _compute_health(coverage, concentration, bus_factors)
         recommendations = _compute_recommendations(knowledge_risks, successors, health)
 
-        # Forecasting
-        forecast_available = False
+        # Forecasting (Now handled natively by Forecast Engine stage)
+        forecast_context = context.forecast_context
+        forecast_available = bool(forecast_context and forecast_context.metrics)
         forecast_note = (
-            "Forecast unavailable: the canonical pipeline produces a single-point "
-            "expertise snapshot per run. Trend analysis requires >=2 historical runs."
+            "Forecast handled by Canonical Predictive Forecasting Engine."
+            if forecast_available else
+            "Forecast unavailable: pending minimum history requirements."
         )
 
         # Validation matrix + native rewrite classification
@@ -853,7 +855,7 @@ class OrganizationIntelligenceStage(PipelineStage):
         self._display_successors(successors)
         self._display_knowledge_risks(knowledge_risks)
         self._display_health(health)
-        self._display_forecast(forecast_note)
+        # self._display_forecast(forecast_note)  # Replaced by ForecastStage
         self._display_recommendations(recommendations)
         self._display_lineage(context.expertise_models, knowledge_risks, bus_factors)
         self._display_validation_matrix(validation_matrix)

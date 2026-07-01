@@ -381,11 +381,11 @@ class ForecastPlatformModule(BaseModule):
         from app.forecast.factory import TimeSeriesFactory
 
         # Register baseline models
-        services.add(LinearTrendModel, LinearTrendModel, scope=ServiceScope.SINGLETON)
-        services.add(ExponentialSmoothingModel, ExponentialSmoothingModel, scope=ServiceScope.SINGLETON)
-        services.add(MovingAverageModel, MovingAverageModel, scope=ServiceScope.SINGLETON)
-        services.add(MomentumProjectionModel, MomentumProjectionModel, scope=ServiceScope.SINGLETON)
-        services.add(ConstantBaselineModel, ConstantBaselineModel, scope=ServiceScope.SINGLETON)
+        services.add(LinearTrendModel, lambda _: LinearTrendModel(), scope=ServiceScope.SINGLETON)
+        services.add(ExponentialSmoothingModel, lambda _: ExponentialSmoothingModel(), scope=ServiceScope.SINGLETON)
+        services.add(MovingAverageModel, lambda _: MovingAverageModel(), scope=ServiceScope.SINGLETON)
+        services.add(MomentumProjectionModel, lambda _: MomentumProjectionModel(), scope=ServiceScope.SINGLETON)
+        services.add(ConstantBaselineModel, lambda _: ConstantBaselineModel(), scope=ServiceScope.SINGLETON)
 
         # Register and populate the Registry
         def build_registry(provider):

@@ -57,7 +57,6 @@ class ForecastProvenance:
     model_version: str
     training_window_size: int
     history_length: int
-    generated_at: str = field(default_factory=lambda: datetime.datetime.now().isoformat())
 
 
 @dataclass(frozen=True)

@@ -105,7 +105,7 @@ class PipelineValidationStage(PipelineStage):
                 "Bus factor computed":        len(org.bus_factors) > 0,
                 "Knowledge risk computed":    len(org.knowledge_risks) > 0,
                 "Health summary computed":    org.health.total_subjects > 0,
-                "Forecast honestly deferred": not org.forecast_available,
+                "Forecast computed deterministically": org.forecast_available if org else bool(context.forecast_context),
                 "Recommendations generated":  len(org.recommendations) > 0,
                 "Validation matrix present":  len(org.validation_matrix) > 0,
             }
