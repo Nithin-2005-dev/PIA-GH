@@ -102,10 +102,14 @@ class ObservationPlatformModule(BaseModule):
         from app.observation.ingestion import RateLimiter
         from app.observation.ingestion import UnifiedIdentityResolver
         from app.observation.validation import ObservationValidationPipeline
+        from app.observation.adapters import default_observation_adapters
 
         services.add(
             AdapterRegistry,
-            AdapterRegistry,
+            lambda _: self._adapter_registry(
+                AdapterRegistry(),
+                default_observation_adapters(),
+            ),
             scope=ServiceScope.SINGLETON,
         )
         services.add(
@@ -164,6 +168,15 @@ class ObservationPlatformModule(BaseModule):
             ),
             scope=ServiceScope.SINGLETON,
         )
+
+    def _adapter_registry(
+        self,
+        registry,
+        adapters,
+    ):
+        for adapter in adapters:
+            registry.register(adapter)
+        return registry
 
 
 class EvidencePlatformModule(BaseModule):
