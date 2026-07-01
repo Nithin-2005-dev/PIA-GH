@@ -1,6 +1,16 @@
 from datetime import UTC
 from datetime import datetime
+from pathlib import Path
+import sys
 from uuid import uuid4
+
+sys.path.insert(
+    0,
+    str(
+        Path(__file__).resolve().parents[1]
+    ),
+)
+
 from app.bootstrap.intelligence_context import (
     IntelligenceContext,
 )

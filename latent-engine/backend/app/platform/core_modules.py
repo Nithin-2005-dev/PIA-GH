@@ -302,6 +302,7 @@ class ForecastingPlatformModule(BaseModule):
         services: ServiceCollection,
     ) -> None:
         from app.forecasting.forecast_service import ForecastService
+        from app.forecasting.validation import ForecastValidationService
         from app.forecasting.linear_forecast_policy import LinearForecastPolicy
 
         services.add(
@@ -314,6 +315,11 @@ class ForecastingPlatformModule(BaseModule):
             lambda provider: ForecastService(
                 provider.resolve(LinearForecastPolicy)
             ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ForecastValidationService,
+            lambda _: ForecastValidationService(),
             scope=ServiceScope.SINGLETON,
         )
 
