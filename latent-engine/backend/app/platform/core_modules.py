@@ -236,10 +236,21 @@ class GraphPlatformModule(BaseModule):
         services: ServiceCollection,
     ) -> None:
         from app.graph.graph_service import GraphService
+        from app.graph.organizational_graph import OrganizationalGraph
 
         services.add(
+            OrganizationalGraph,
+            lambda _: OrganizationalGraph(
+                nodes=[],
+                edges=[],
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
             GraphService,
-            GraphService,
+            lambda provider: GraphService(
+                provider.resolve(OrganizationalGraph)
+            ),
             scope=ServiceScope.SINGLETON,
         )
 
@@ -353,6 +364,262 @@ class ExecutivePlatformModule(BaseModule):
             RoadmapService,
             scope=ServiceScope.SINGLETON,
         )
+
+
+class IntelligencePlatformModule(BaseModule):
+    name = "intelligence"
+    version = "1.0"
+    dependencies = (
+        "estimation",
+        "forecasting",
+    )
+    capabilities = (
+        "intelligence.context",
+        "intelligence.ownership",
+        "intelligence.organization",
+    )
+
+    def __init__(
+        self,
+        projection,
+        context=None,
+    ):
+        self._projection = projection
+        self._context = context
+
+    def configure_services(
+        self,
+        services: ServiceCollection,
+    ) -> None:
+        from app.bootstrap.intelligence_context import IntelligenceContext
+        from app.concentration.concentration_service import ConcentrationService
+        from app.concentration.policies.expertise_concentration_policy import ExpertiseConcentrationPolicy
+        from app.coverage.coverage_service import CoverageService
+        from app.coverage.policies.expertise_coverage_policy import ExpertiseCoveragePolicy
+        from app.estimator.expertise_projection import ExpertiseProjection
+        from app.forecasting.forecast_pipeline_service import ForecastPipelineService
+        from app.forecasting.forecast_service import ForecastService
+        from app.forecasting.forecast_severity_service import ForecastSeverityService
+        from app.forecasting.future_risk_pipeline_service import FutureRiskPipelineService
+        from app.forecasting.linear_forecast_policy import LinearForecastPolicy
+        from app.health.health_service import HealthService
+        from app.health.policies.organizational_health_policy import OrganizationalHealthPolicy
+        from app.history.health_projection import HealthProjection
+        from app.history.history_service import HistoryService
+        from app.knowledge_transfer.policies.simple_transfer_policy import SimpleTransferPolicy
+        from app.knowledge_transfer.transfer_service import TransferService
+        from app.organization.organization_dashboard_service import OrganizationDashboardService
+        from app.organization.organization_health_service import OrganizationHealthService
+        from app.organization.organization_readiness_service import OrganizationReadinessService
+        from app.organization.organization_risk_service import OrganizationRiskService
+        from app.organization.organization_transfer_service import OrganizationTransferService
+        from app.ownership.ownership_service import OwnershipService
+        from app.ownership.policies.expertise_ownership_policy import ExpertiseOwnershipPolicy
+        from app.query.expertise_query_service import ExpertiseQueryService
+        from app.risk.bus_factor_service import BusFactorService
+        from app.risk.policies.ownership_bus_factor_policy import OwnershipBusFactorPolicy
+        from app.simulation.policies.expertise_readiness_policy import ExpertiseReadinessPolicy
+        from app.simulation.readiness_service import ReadinessService
+        from app.successor.policies.expertise_successor_policy import ExpertiseSuccessorPolicy
+        from app.successor.successor_service import SuccessorService
+
+        services.add_instance(
+            ExpertiseProjection,
+            self._projection,
+        )
+        if self._context is not None:
+            services.add_instance(
+                IntelligenceContext,
+                self._context,
+            )
+        services.add(
+            ExpertiseQueryService,
+            lambda provider: ExpertiseQueryService(
+                provider.resolve(ExpertiseProjection)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ExpertiseOwnershipPolicy,
+            lambda _: ExpertiseOwnershipPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            OwnershipService,
+            lambda provider: OwnershipService(
+                provider.resolve(ExpertiseQueryService),
+                provider.resolve(ExpertiseOwnershipPolicy),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ExpertiseSuccessorPolicy,
+            lambda _: ExpertiseSuccessorPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            SuccessorService,
+            lambda provider: SuccessorService(
+                provider.resolve(OwnershipService),
+                provider.resolve(ExpertiseSuccessorPolicy),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ExpertiseCoveragePolicy,
+            lambda _: ExpertiseCoveragePolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            CoverageService,
+            lambda provider: CoverageService(
+                provider.resolve(ExpertiseCoveragePolicy)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ExpertiseConcentrationPolicy,
+            lambda _: ExpertiseConcentrationPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ConcentrationService,
+            lambda provider: ConcentrationService(
+                provider.resolve(ExpertiseConcentrationPolicy)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            OwnershipBusFactorPolicy,
+            lambda _: OwnershipBusFactorPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            BusFactorService,
+            lambda provider: BusFactorService(
+                provider.resolve(OwnershipService),
+                provider.resolve(OwnershipBusFactorPolicy),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            OrganizationalHealthPolicy,
+            lambda _: OrganizationalHealthPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            HealthService,
+            lambda provider: HealthService(
+                provider.resolve(OrganizationalHealthPolicy)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            HealthProjection,
+            HealthProjection,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            HistoryService,
+            lambda provider: HistoryService(
+                provider.resolve(HealthProjection)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            LinearForecastPolicy,
+            lambda _: LinearForecastPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ForecastService,
+            lambda provider: ForecastService(
+                provider.resolve(LinearForecastPolicy)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ForecastPipelineService,
+            lambda provider: ForecastPipelineService(
+                provider.resolve(HistoryService),
+                provider.resolve(ForecastService),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            FutureRiskPipelineService,
+            lambda provider: FutureRiskPipelineService(
+                provider.resolve(ForecastPipelineService)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            SimpleTransferPolicy,
+            lambda _: SimpleTransferPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            TransferService,
+            lambda provider: TransferService(
+                provider.resolve(SimpleTransferPolicy)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ExpertiseReadinessPolicy,
+            lambda _: ExpertiseReadinessPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ReadinessService,
+            lambda provider: ReadinessService(
+                provider.resolve(SuccessorService),
+                provider.resolve(ExpertiseQueryService),
+                provider.resolve(ExpertiseReadinessPolicy),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ForecastSeverityService,
+            lambda _: ForecastSeverityService(),
+            scope=ServiceScope.SINGLETON,
+        )
+        if self._context is not None:
+            services.add(
+                OrganizationRiskService,
+                lambda provider: OrganizationRiskService(
+                    provider.resolve(IntelligenceContext)
+                ),
+                scope=ServiceScope.SINGLETON,
+            )
+            services.add(
+                OrganizationHealthService,
+                lambda provider: OrganizationHealthService(
+                    provider.resolve(IntelligenceContext)
+                ),
+                scope=ServiceScope.SINGLETON,
+            )
+            services.add(
+                OrganizationReadinessService,
+                lambda provider: OrganizationReadinessService(
+                    provider.resolve(IntelligenceContext)
+                ),
+                scope=ServiceScope.SINGLETON,
+            )
+            services.add(
+                OrganizationTransferService,
+                lambda provider: OrganizationTransferService(
+                    provider.resolve(IntelligenceContext)
+                ),
+                scope=ServiceScope.SINGLETON,
+            )
+            services.add(
+                OrganizationDashboardService,
+                lambda provider: OrganizationDashboardService(
+                    provider.resolve(IntelligenceContext)
+                ),
+                scope=ServiceScope.SINGLETON,
+            )
 
 
 def default_platform_modules(

@@ -18,6 +18,7 @@ from app.platform.core_modules import EvidencePlatformModule
 from app.platform.core_modules import ExecutivePlatformModule
 from app.platform.core_modules import ForecastingPlatformModule
 from app.platform.core_modules import GraphPlatformModule
+from app.platform.core_modules import IntelligencePlatformModule
 from app.platform.core_modules import MeasurementPlatformModule
 from app.platform.core_modules import ObservationPlatformModule
 from app.platform.core_modules import SimulationPlatformModule

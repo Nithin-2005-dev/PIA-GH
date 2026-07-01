@@ -117,6 +117,15 @@ from app.organization.organization_transfer_service import (
 from app.organization.organization_dashboard_service import (
     OrganizationDashboardService,
 )
+from app.platform.core_modules import (
+    IntelligencePlatformModule,
+    default_platform_modules,
+)
+from app.platform.runtime import (
+    PlatformRuntime,
+)
+
+
 class IntelligenceContext:
 
     def __init__(
@@ -125,124 +134,36 @@ class IntelligenceContext:
     ):
 
         self.projection = projection
+        self.runtime = PlatformRuntime.create()
+        for module in default_platform_modules():
+            self.runtime.register_module(module)
+        self.runtime.register_module(
+            IntelligencePlatformModule(
+                projection=projection,
+                context=self,
+            )
+        )
+        self.platform = self.runtime.build()
+        self.platform.initialize()
+        provider = self.platform.provider
 
-        self.query_service = (
-            ExpertiseQueryService(
-                projection
-            )
-        )
-
-        self.ownership_service = (
-            OwnershipService(
-                self.query_service,
-                ExpertiseOwnershipPolicy(),
-            )
-        )
-
-        self.successor_service = (
-            SuccessorService(
-                self.ownership_service,
-                ExpertiseSuccessorPolicy(),
-            )
-        )
-
-        self.coverage_service = (
-            CoverageService(
-                ExpertiseCoveragePolicy()
-            )
-        )
-
-        self.concentration_service = (
-            ConcentrationService(
-                ExpertiseConcentrationPolicy()
-            )
-        )
-
-        self.bus_factor_service = (
-            BusFactorService(
-                self.ownership_service,
-                OwnershipBusFactorPolicy(),
-            )
-        )
-
-        self.health_service = (
-            HealthService(
-                OrganizationalHealthPolicy()
-            )
-        )
-
-        self.health_projection = (
-            HealthProjection()
-        )
-
-        self.history_service = (
-            HistoryService(
-                self.health_projection
-            )
-        )
-
-        self.forecast_service = (
-            ForecastService(
-                LinearForecastPolicy()
-            )
-        )
-
-        self.forecast_pipeline_service = (
-            ForecastPipelineService(
-                self.history_service,
-                self.forecast_service,
-            )
-        )
-
-        self.future_risk_pipeline_service = (
-            FutureRiskPipelineService(
-                self.forecast_pipeline_service
-            )
-        )
-
-        self.transfer_service = (
-            TransferService(
-                SimpleTransferPolicy()
-            )
-        )
-        
-        self.readiness_service = (
-            ReadinessService(
-                self.successor_service,
-                self.query_service,
-                ExpertiseReadinessPolicy(),
-            )
-        )
-        
-        self.forecast_severity_service = (
-            ForecastSeverityService()
-        )
-        self.organization_risk_service = (
-            OrganizationRiskService(
-                self
-            )
-        )
-        
-        self.organization_health_service = (
-            OrganizationHealthService(
-                self
-            )
-        )
-        
-        self.organization_readiness_service = (
-        OrganizationReadinessService(
-            self
-        )
-    )
-    
-        self.organization_transfer_service = (
-            OrganizationTransferService(
-                self
-            )
-        )
-        
-        self.organization_dashboard_service = (
-        OrganizationDashboardService(
-            self
-        )
-    )
+        self.query_service = provider.resolve(ExpertiseQueryService)
+        self.ownership_service = provider.resolve(OwnershipService)
+        self.successor_service = provider.resolve(SuccessorService)
+        self.coverage_service = provider.resolve(CoverageService)
+        self.concentration_service = provider.resolve(ConcentrationService)
+        self.bus_factor_service = provider.resolve(BusFactorService)
+        self.health_service = provider.resolve(HealthService)
+        self.health_projection = provider.resolve(HealthProjection)
+        self.history_service = provider.resolve(HistoryService)
+        self.forecast_service = provider.resolve(ForecastService)
+        self.forecast_pipeline_service = provider.resolve(ForecastPipelineService)
+        self.future_risk_pipeline_service = provider.resolve(FutureRiskPipelineService)
+        self.transfer_service = provider.resolve(TransferService)
+        self.readiness_service = provider.resolve(ReadinessService)
+        self.forecast_severity_service = provider.resolve(ForecastSeverityService)
+        self.organization_risk_service = provider.resolve(OrganizationRiskService)
+        self.organization_health_service = provider.resolve(OrganizationHealthService)
+        self.organization_readiness_service = provider.resolve(OrganizationReadinessService)
+        self.organization_transfer_service = provider.resolve(OrganizationTransferService)
+        self.organization_dashboard_service = provider.resolve(OrganizationDashboardService)
