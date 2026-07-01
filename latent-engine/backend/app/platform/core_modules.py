@@ -394,6 +394,7 @@ class ExecutivePlatformModule(BaseModule):
     ) -> None:
         from app.executive.executive_recommendation_service import ExecutiveRecommendationService
         from app.executive.roadmap_service import RoadmapService
+        from app.platform.hardening import ProductionHardeningService
 
         services.add(
             ExecutiveRecommendationService,
@@ -403,6 +404,11 @@ class ExecutivePlatformModule(BaseModule):
         services.add(
             RoadmapService,
             RoadmapService,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ProductionHardeningService,
+            lambda _: ProductionHardeningService(),
             scope=ServiceScope.SINGLETON,
         )
 

@@ -32,6 +32,9 @@ from app.platform.event_bus import EventPriority
 from app.platform.event_bus import PlatformEvent
 from app.platform.health import HealthRegistry
 from app.platform.health import HealthStatus
+from app.platform.hardening import ProductionCheck
+from app.platform.hardening import ProductionHardeningService
+from app.platform.hardening import ProductionReadinessReport
 from app.platform.lifecycle import LifecycleManager
 from app.platform.module import BaseModule
 from app.platform.module import ModuleRegistry
