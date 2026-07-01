@@ -140,6 +140,10 @@ class BaseMeasurementProvider:
             ),
             validation_status=ValidationStatus.NOT_RUN,
             metadata={
+                "actor_ids": tuple(
+                    actor.id
+                    for actor in observation.actors
+                ),
                 "precision": precision,
                 "provider": self.name,
                 **(metadata or {}),

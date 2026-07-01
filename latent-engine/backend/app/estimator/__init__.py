@@ -12,3 +12,12 @@ Rules:
 - Never mutate state.
 - Always return new immutable estimates.
 """
+from app.estimator.semantic_pipeline import ExpertiseProjectionResult
+from app.estimator.semantic_pipeline import SemanticEvidenceExpertiseBridge
+from app.estimator.semantic_pipeline import SemanticExpertiseProjectionPipeline
+
+__all__ = [
+    "ExpertiseProjectionResult",
+    "SemanticEvidenceExpertiseBridge",
+    "SemanticExpertiseProjectionPipeline",
+]

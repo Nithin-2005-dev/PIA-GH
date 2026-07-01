@@ -222,15 +222,29 @@ class EstimationPlatformModule(BaseModule):
     ) -> None:
         from app.estimator.policies.exponential_decay_policy import ExponentialDecayPolicy
         from app.estimator.policies.rule_expertise_scoring_policy import RuleExpertiseScoringPolicy
+        from app.estimator.semantic_pipeline import SemanticEvidenceExpertiseBridge
+        from app.estimator.semantic_pipeline import SemanticExpertiseProjectionPipeline
 
         services.add(
             ExponentialDecayPolicy,
-            ExponentialDecayPolicy,
+            lambda _: ExponentialDecayPolicy(),
             scope=ServiceScope.SINGLETON,
         )
         services.add(
             RuleExpertiseScoringPolicy,
-            RuleExpertiseScoringPolicy,
+            lambda _: RuleExpertiseScoringPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            SemanticEvidenceExpertiseBridge,
+            lambda _: SemanticEvidenceExpertiseBridge(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            SemanticExpertiseProjectionPipeline,
+            lambda provider: SemanticExpertiseProjectionPipeline(
+                provider.resolve(SemanticEvidenceExpertiseBridge)
+            ),
             scope=ServiceScope.SINGLETON,
         )
 
