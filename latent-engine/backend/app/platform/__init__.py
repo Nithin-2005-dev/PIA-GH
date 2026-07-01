@@ -13,6 +13,7 @@ from app.platform.common import ValidationResult
 from app.platform.config import Configuration
 from app.platform.config import ConfigurationProvider
 from app.platform.core_modules import AgentPlatformModule
+from app.platform.core_modules import DecisionPlatformModule
 from app.platform.core_modules import EstimationPlatformModule
 from app.platform.core_modules import EvidencePlatformModule
 from app.platform.core_modules import ExecutivePlatformModule

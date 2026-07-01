@@ -381,6 +381,7 @@ def main():
         "graph",
         "forecasting",
         "simulation",
+        "decision",
         "agent",
         "executive",
     )

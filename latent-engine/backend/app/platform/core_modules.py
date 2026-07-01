@@ -355,6 +355,7 @@ class AgentPlatformModule(BaseModule):
     dependencies = (
         "graph",
         "simulation",
+        "decision",
     )
     capabilities = (
         "agent.reasoning",
@@ -379,6 +380,7 @@ class ExecutivePlatformModule(BaseModule):
     version = "1.0"
     dependencies = (
         "agent",
+        "decision",
         "forecasting",
     )
     capabilities = (
@@ -401,6 +403,32 @@ class ExecutivePlatformModule(BaseModule):
         services.add(
             RoadmapService,
             RoadmapService,
+            scope=ServiceScope.SINGLETON,
+        )
+
+
+class DecisionPlatformModule(BaseModule):
+    name = "decision"
+    version = "1.0"
+    dependencies = (
+        "graph",
+        "forecasting",
+        "simulation",
+    )
+    capabilities = (
+        "decision.optimization",
+        "decision.portfolio",
+    )
+
+    def configure_services(
+        self,
+        services: ServiceCollection,
+    ) -> None:
+        from app.decision.optimization import DecisionOptimizationEngine
+
+        services.add(
+            DecisionOptimizationEngine,
+            lambda _: DecisionOptimizationEngine(),
             scope=ServiceScope.SINGLETON,
         )
 
@@ -671,6 +699,7 @@ def default_platform_modules(
         GraphPlatformModule(),
         ForecastingPlatformModule(),
         SimulationPlatformModule(),
+        DecisionPlatformModule(),
         AgentPlatformModule(),
         ExecutivePlatformModule(),
     )
