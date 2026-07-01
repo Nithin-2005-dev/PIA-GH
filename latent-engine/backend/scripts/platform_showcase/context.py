@@ -28,6 +28,7 @@ class ExpertiseModel:
 @dataclass(frozen=True, slots=True)
 class KnowledgeModel:
     id: str
+    entity_type: str
     topic: str
     expertise_count: int
     average_score: float

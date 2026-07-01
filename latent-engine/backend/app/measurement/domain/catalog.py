@@ -342,4 +342,218 @@ class DefaultMeasurementCatalog:
                 references=standards,
                 tags=("subsystem", "spread"),
             ),
+
+            # ---------------------------------------------------------
+            # Developer Extended Measurements (Tier 2)
+            # ---------------------------------------------------------
+            MeasurementDefinition(
+                id="developer_knowledge_spread",
+                name="Developer Knowledge Spread",
+                description=(
+                    "Number of distinct subsystems the developer touched in the window. "
+                    "Higher = broader knowledge, lower = specialist."
+                ),
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="knowledge_spread",
+                category="knowledge",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("author_name", "files"),
+                normalizer="identity",
+                aggregation_strategy="max",
+                references=standards,
+                tags=("developer", "knowledge", "breadth"),
+            ),
+            MeasurementDefinition(
+                id="developer_subsystem_focus",
+                name="Developer Subsystem Focus",
+                description=(
+                    "Fraction of the developer's commits concentrated in their primary subsystem. "
+                    "Score 1.0 = all commits in one subsystem, 0.0 = uniform spread."
+                ),
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="ownership_concentration",
+                category="knowledge",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("author_name", "files"),
+                normalizer="bounded_score_clamp",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("developer", "knowledge", "focus"),
+            ),
+            MeasurementDefinition(
+                id="developer_recency_score",
+                name="Developer Recency Score",
+                description=(
+                    "Normalized recency of the developer's last contribution. "
+                    "Score 1.0 = committed within last 7 days, decays exponentially."
+                ),
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="activity_recency",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("author_name", "timestamp"),
+                normalizer="bounded_score_clamp",
+                aggregation_strategy="max",
+                references=standards,
+                tags=("developer", "activity", "temporal"),
+            ),
+            MeasurementDefinition(
+                id="developer_commit_frequency",
+                name="Developer Commit Frequency",
+                description="Total number of commits by the developer in the observation window.",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="activity_frequency",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("author_name",),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("developer", "activity"),
+            ),
+            MeasurementDefinition(
+                id="developer_files_owned",
+                name="Developer Files Owned",
+                description="Number of distinct files the developer has touched (proxy for ownership surface).",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="ownership",
+                category="knowledge",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("author_name", "files"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("developer", "ownership"),
+            ),
+
+            # ---------------------------------------------------------
+            # Subsystem Extended Measurements (Tier 2)
+            # ---------------------------------------------------------
+            MeasurementDefinition(
+                id="subsystem_churn_rate",
+                name="Subsystem Churn Rate",
+                description="Total LOC changed in the subsystem per observation window.",
+                unit=MeasurementUnit.LOC,
+                version="1.0",
+                minimum=0.0,
+                concept_id="churn",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("subsystem", "changes"),
+                normalizer="identity",
+                aggregation_strategy="sum",
+                references=standards,
+                tags=("subsystem", "churn"),
+            ),
+            MeasurementDefinition(
+                id="subsystem_contributor_count",
+                name="Subsystem Contributor Count",
+                description="Number of unique developers who contributed to this subsystem in the window.",
+                unit=MeasurementUnit.COUNT,
+                version="1.0",
+                minimum=0.0,
+                concept_id="ownership",
+                category="knowledge",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("subsystem", "author"),
+                normalizer="identity",
+                aggregation_strategy="max",
+                references=standards,
+                tags=("subsystem", "ownership", "bus_factor"),
+            ),
+            MeasurementDefinition(
+                id="subsystem_file_concentration",
+                name="Subsystem File Concentration",
+                description=(
+                    "Gini coefficient of file-level churn within the subsystem. "
+                    "Score 1.0 = all churn in one file, 0.0 = perfectly uniform."
+                ),
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="ownership_concentration",
+                category="structural",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("subsystem", "file_changes"),
+                normalizer="bounded_score_clamp",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("subsystem", "concentration", "risk"),
+            ),
+            MeasurementDefinition(
+                id="subsystem_coupling_score",
+                name="Subsystem Coupling Score",
+                description=(
+                    "How frequently files within the subsystem change together in the same commit. "
+                    "Higher = tighter internal coupling."
+                ),
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="coupling",
+                category="structural",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("subsystem", "files"),
+                normalizer="bounded_score_clamp",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("subsystem", "coupling", "architecture"),
+            ),
+            MeasurementDefinition(
+                id="subsystem_volatility",
+                name="Subsystem Volatility",
+                description=(
+                    "Standard deviation of per-commit churn within the subsystem. "
+                    "High variance = unpredictable change patterns."
+                ),
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                concept_id="churn",
+                category="temporal",
+                expected_range=ExpectedRange(minimum=0.0),
+                required_signals=("subsystem", "changes"),
+                normalizer="identity",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("subsystem", "volatility", "temporal"),
+            ),
+
+            # ---------------------------------------------------------
+            # File Ownership (Module entity)
+            # ---------------------------------------------------------
+            MeasurementDefinition(
+                id="file_ownership_score",
+                name="File Ownership Score",
+                description=(
+                    "Fraction of this file's touches attributable to the majority author. "
+                    "Score 1.0 = single author, 0.0 = perfectly shared."
+                ),
+                unit=MeasurementUnit.SCORE,
+                version="1.0",
+                minimum=0.0,
+                maximum=1.0,
+                concept_id="ownership_concentration",
+                category="knowledge",
+                expected_range=ExpectedRange(minimum=0.0, maximum=1.0),
+                required_signals=("file_path", "author_name"),
+                normalizer="bounded_score_clamp",
+                aggregation_strategy="mean",
+                references=standards,
+                tags=("module", "ownership", "bus_factor"),
+            ),
         ]

@@ -23,11 +23,20 @@ class EvidenceRule:
     threshold: float
     weight: float = 1.0
     explanation: str = ""
+    field_source: str = "value"
 
     def matches(
         self,
-        value: float,
+        ref: Any,
     ) -> bool:
+        value = ref.value
+        if self.field_source == "percentile" and ref.calibration and ref.calibration.percentile is not None:
+            value = ref.calibration.percentile
+        elif self.field_source == "robust_z" and ref.calibration and ref.calibration.robust_z is not None:
+            value = ref.calibration.robust_z
+        elif self.field_source == "z_score" and ref.calibration and ref.calibration.z_score is not None:
+            value = ref.calibration.z_score
+
         if self.operator == EvidenceRuleOperator.GT:
             return value > self.threshold
         if self.operator == EvidenceRuleOperator.GTE:

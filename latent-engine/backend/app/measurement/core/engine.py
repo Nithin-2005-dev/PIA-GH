@@ -9,6 +9,7 @@ from app.measurement.evaluators.complexity import ChangeComplexityEvaluator
 from app.measurement.evaluators.impact import ChangeImpactEvaluator
 from app.measurement.evaluators.developer_activity import DeveloperActivityEvaluator
 from app.measurement.evaluators.file_activity import FileActivityEvaluator
+from app.measurement.evaluators.file_ownership import FileOwnershipEvaluator
 from app.measurement.evaluators.subsystem_activity import SubsystemActivityEvaluator
 from app.measurement.core.interfaces import ConfidenceEstimator
 from app.measurement.core.interfaces import MeasurementEvaluator
@@ -66,6 +67,7 @@ class MeasurementEngine:
                 DeveloperActivityEvaluator(),
                 FileActivityEvaluator(),
                 SubsystemActivityEvaluator(),
+                FileOwnershipEvaluator(),
             ],
             normalizers=[
                 UnitConversionNormalizer(),
@@ -125,7 +127,10 @@ class MeasurementEngine:
                 )
             )
 
-        return measurements
+        # Increment 1: Perform mathematical calibration over the measurement population
+        from app.measurement.core.calibration.engine import StatisticalCalibrationEngine
+        calibration_engine = StatisticalCalibrationEngine()
+        return list(calibration_engine.calibrate(measurements))
 
     def measure_event(
         self,

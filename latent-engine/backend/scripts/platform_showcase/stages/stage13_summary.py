@@ -81,4 +81,34 @@ class SummaryStage(PipelineStage):
         for name, timing in context.timings.items():
             metric(name, f"{timing.duration:.3f}s")
 
+        # Increment 5: Snapshot persistence for temporal intelligence
+        import json
+        from datetime import datetime
+        
+        snapshot_dir = context.output_directory / "history"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        snapshot_file = snapshot_dir / f"snapshot_{timestamp}.json"
+        
+        snapshot_data = {
+            "timestamp": timestamp,
+            "metrics": {
+                "repository": context.repository,
+                "measurements": len(context.measurements),
+                "evidence": len(package.evidence) if package else 0,
+                "expertise_models": len(context.expertise_models),
+                "knowledge_models": len(context.knowledge),
+                "decisions": len(context.decisions),
+            },
+            "org_intelligence": {
+                "health": org.health.average_health if org else 0.0,
+                "critical_topics": org.health.critical_count if org else 0,
+            } if org else {}
+        }
+        
+        with open(snapshot_file, "w", encoding="utf-8") as f:
+            json.dump(snapshot_data, f, indent=2)
+            
+        success(f"Snapshot persisted to {snapshot_file.name}")
         success("Canonical showcase completed")

@@ -154,7 +154,7 @@ class EvidenceSynthesisEngine:
             and rule.matches(
                 measurements_by_definition[
                     rule.measurement_id
-                ].value
+                ]
             )
         ]
 

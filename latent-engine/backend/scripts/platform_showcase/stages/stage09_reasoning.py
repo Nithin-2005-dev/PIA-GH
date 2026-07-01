@@ -12,6 +12,7 @@ Flow:
 
 from __future__ import annotations
 
+from collections import defaultdict
 from uuid import NAMESPACE_URL, uuid5
 
 from ..context import OrgIntelligenceResult, PlatformContext, ReasoningResult
@@ -70,74 +71,63 @@ class ReasoningStage(PipelineStage):
         knowledge,
         org_intel: OrgIntelligenceResult | None,
     ) -> list[ReasoningResult]:
-        """
-        Derives one ReasoningResult per knowledge topic.
-
-        When org_intel is available, the conclusion and confidence are
-        adjusted by risk signals from org analysis:
-            - HIGH knowledge risk → lower confidence, stronger warning conclusion
-            - LOW bus factor      → escalated urgency in conclusion
-        """
-        # Build lookup maps from org intel for O(1) access
         risk_map = {}
         bus_map  = {}
+        coverage_map = {}
+        concentration_map = {}
+        ownership_by_dev = defaultdict(list)
+        
         if org_intel:
             risk_map = {r.subject: r for r in org_intel.knowledge_risks}
             bus_map  = {b.subject: b for b in org_intel.bus_factors}
+            coverage_map = {c.subject: c for c in org_intel.coverage}
+            concentration_map = {c.subject: c for c in org_intel.concentration}
+            for o in org_intel.ownership:
+                ownership_by_dev[o.subject].append(o)
 
         results: list[ReasoningResult] = []
 
         for item in knowledge:
-            # Base conclusion from expertise score
-            if item.average_score >= 0.70:
-                base_conclusion = "high-confidence organizational signal"
-            elif item.average_score >= 0.40:
-                base_conclusion = "moderate organizational signal"
-            else:
-                base_conclusion = "emerging organizational signal"
-
-            # Enrich with org intelligence signals
-            risk   = risk_map.get(item.topic)
-            bf     = bus_map.get(item.topic)
-            org_signal = ""
+            conclusion = ""
             confidence_adjustment = 0.0
+            rationale_parts = []
+            
+            if item.entity_type == "developer":
+                primary = [o.category for o in ownership_by_dev.get(item.topic, []) if o.ownership_level == "PRIMARY"]
+                if primary:
+                    conclusion = f"Developer {item.topic} is the primary expert for {', '.join(primary)}."
+                    confidence_adjustment += 0.1
+                else:
+                    conclusion = f"Developer {item.topic} provides broad support across multiple subsystems."
+            
+            elif item.entity_type == "subsystem":
+                bf = bus_map.get(item.topic)
+                risk = risk_map.get(item.topic)
+                cov = coverage_map.get(item.topic)
+                conc = concentration_map.get(item.topic)
+                
+                if bf and bf.bus_factor <= 1:
+                    conclusion = f"CRITICAL: Subsystem {item.topic} has a bus factor of {bf.bus_factor} with {bf.coverage:.0f}% coverage gap."
+                    confidence_adjustment += 0.2
+                    rationale_parts.append(f"Single point of failure detected in {item.topic}.")
+                elif conc and conc.risk_level == "HIGH":
+                    conclusion = f"WARNING: Ownership in {item.topic} is highly concentrated (risk score={conc.concentration_score:.2f})."
+                    confidence_adjustment += 0.1
+                elif cov and cov.coverage_level == "WEAK":
+                    conclusion = f"NOTICE: Subsystem {item.topic} has weak knowledge coverage ({cov.expert_count} experts)."
+                else:
+                    conclusion = f"Subsystem {item.topic} is stable and adequately covered."
+            
+            else:
+                conclusion = f"Topic {item.topic} requires ongoing monitoring."
 
-            if risk and risk.risk_level == "HIGH":
-                org_signal = (
-                    f"; CRITICAL: bus factor={risk.bus_factor}, "
-                    f"owner_count={risk.owner_count} — immediate action required"
-                )
-                confidence_adjustment = +0.05   # elevate confidence in the risk signal
-            elif risk and risk.risk_level == "MEDIUM":
-                org_signal = (
-                    f"; MODERATE: bus factor={risk.bus_factor}, "
-                    f"owner_count={risk.owner_count} — monitor and plan"
-                )
-            elif bf and bf.bus_factor == 1:
-                org_signal = f"; single-person dependency (bus factor=1)"
-                confidence_adjustment = +0.03
-
-            conclusion = base_conclusion + org_signal
-
-            # Build rationale
             base_rationale = (
-                f"Reasoned from {item.expertise_count} expertise model(s) "
-                f"with average score {item.average_score:.3f}."
+                f"Derived from {item.expertise_count} expertise model(s) "
+                f"with score {item.average_score:.3f}. "
             )
-            org_rationale = ""
-            if org_intel:
-                org_rationale = (
-                    f" Org intelligence: "
-                    f"health_avg={org_intel.health.average_health:.3f}, "
-                    f"critical_topics={org_intel.health.critical_count}."
-                )
+            rationale = base_rationale + " ".join(rationale_parts)
 
-            rationale = base_rationale + org_rationale
-
-            final_confidence = min(
-                1.0,
-                item.average_confidence + confidence_adjustment,
-            )
+            final_confidence = min(1.0, item.average_confidence + confidence_adjustment)
 
             results.append(
                 ReasoningResult(

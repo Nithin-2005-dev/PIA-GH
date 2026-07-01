@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import math
 from uuid import NAMESPACE_URL, uuid5
 
 from ..context import ExpertiseModel, PlatformContext
@@ -29,11 +30,24 @@ class ExpertiseStage(PipelineStage):
 
         expertise_models = []
         for (entity_type, entity_name), items in grouped.items():
-            confidence = sum(item.confidence for item in items) / len(items)
-            uncertainty = sum(item.uncertainty for item in items) / len(items)
-            quality = sum(item.quality for item in items) / len(items)
-            strength = sum(item.strength for item in items) / len(items)
-            score = strength * confidence * quality
+            total_weight = sum(item.confidence for item in items)
+            if total_weight == 0:
+                total_weight = len(items)
+                weights = [1.0] * len(items)
+            else:
+                weights = [item.confidence for item in items]
+
+            confidence = sum(w * item.confidence for w, item in zip(weights, items)) / total_weight
+            uncertainty = sum(w * item.uncertainty for w, item in zip(weights, items)) / total_weight
+            quality = sum(w * item.quality for w, item in zip(weights, items)) / total_weight
+            strength = sum(w * item.strength for w, item in zip(weights, items)) / total_weight
+
+            log_score_sum = 0.0
+            for w, item in zip(weights, items):
+                item_score = max(item.strength * item.confidence * item.quality, 1e-6)
+                log_score_sum += w * math.log(item_score)
+            
+            score = math.exp(log_score_sum / total_weight)
             model_id = str(
                 uuid5(
                     NAMESPACE_URL,

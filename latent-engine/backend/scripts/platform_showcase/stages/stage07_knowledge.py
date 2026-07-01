@@ -60,25 +60,39 @@ class KnowledgeStage(PipelineStage):
         self,
         expertise_models,
     ) -> list[KnowledgeModel]:
+        from app.measurement.subsystem.boundary import SubsystemResolver
+        resolver = SubsystemResolver.default()
+
         grouped: defaultdict[tuple[str, str], list] = defaultdict(list)
         for model in expertise_models:
-            grouped[(model.category, model.subject)].append(model)
+            if model.category == "module":
+                semantic_topic = resolver.resolve(model.subject)
+                entity_type = "subsystem"
+            elif model.category == "developer":
+                semantic_topic = model.subject
+                entity_type = "developer"
+            else:
+                semantic_topic = model.subject
+                entity_type = model.category
+
+            grouped[(entity_type, semantic_topic)].append(model)
 
         knowledge = []
-        for (category, subject), models in grouped.items():
+        for (entity_type, topic), models in grouped.items():
             average_score = sum(m.score for m in models) / len(models)
             average_confidence = sum(m.confidence for m in models) / len(models)
             average_uncertainty = sum(m.uncertainty for m in models) / len(models)
             knowledge.append(
                 KnowledgeModel(
-                    id=str(uuid5(NAMESPACE_URL, f"knowledge|{category}|{subject}")),
-                    topic=subject,
+                    id=str(uuid5(NAMESPACE_URL, f"knowledge|{entity_type}|{topic}")),
+                    entity_type=entity_type,
+                    topic=topic,
                     expertise_count=len(models),
                     average_score=average_score,
                     average_confidence=average_confidence,
                     average_uncertainty=average_uncertainty,
                     summary=(
-                        f"Knowledge about {category} '{subject}' is supported by {len(models)} "
+                        f"Knowledge about {entity_type} '{topic}' is supported by {len(models)} "
                         f"expertise model(s) with average score {average_score:.3f}."
                     ),
                 )

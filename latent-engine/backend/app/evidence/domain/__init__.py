@@ -83,6 +83,7 @@ class EvidenceMeasurementRef:
     validation_status: str
     entity_ids: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    calibration: Any | None = None
 
     @classmethod
     def from_measurement(
@@ -103,6 +104,7 @@ class EvidenceMeasurementRef:
             validation_status=measurement.validation_status.value,
             entity_ids=measurement.provenance.source_entity_ids,
             metadata=measurement.metadata,
+            calibration=measurement.calibration,
         )
 
 

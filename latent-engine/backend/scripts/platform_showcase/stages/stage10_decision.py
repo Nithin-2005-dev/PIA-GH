@@ -20,20 +20,31 @@ class DecisionStage(PipelineStage):
 
         decisions = []
         for result in reasoning_results:
-            if "CRITICAL" in result.conclusion or "high-confidence" in result.conclusion:
+            if "CRITICAL: Subsystem" in result.conclusion:
+                action_type = "succession_planning"
                 priority = "high"
-                action = f"Assign active mitigation owner for {result.subject}."
-            elif "MODERATE" in result.conclusion or "moderate" in result.conclusion:
+                action = f"Initiate succession planning and cross-training for {result.subject}."
+            elif "WARNING: Ownership" in result.conclusion:
+                action_type = "knowledge_transfer"
                 priority = "medium"
-                action = f"Schedule targeted review for {result.subject}."
+                action = f"Schedule knowledge transfer sessions for {result.subject}."
+            elif "NOTICE: Subsystem" in result.conclusion:
+                action_type = "documentation_priority"
+                priority = "medium"
+                action = f"Prioritize documentation and onboarding for {result.subject}."
+            elif "primary expert" in result.conclusion:
+                action_type = "reviewer_assignment"
+                priority = "low"
+                action = f"Route critical reviews for {result.subject} to primary expert."
             else:
+                action_type = "monitoring"
                 priority = "low"
                 action = f"Monitor {result.subject} as more evidence arrives."
 
             decisions.append(
                 Decision(
-                    id=str(uuid5(NAMESPACE_URL, f"decision|{result.id}|{priority}")),
-                    title=f"{result.subject.title()} Decision",
+                    id=str(uuid5(NAMESPACE_URL, f"decision|{result.id}|{action_type}")),
+                    title=f"{result.subject.title()} - {action_type.replace('_', ' ').title()}",
                     action=action,
                     priority=priority,
                     confidence=result.confidence,

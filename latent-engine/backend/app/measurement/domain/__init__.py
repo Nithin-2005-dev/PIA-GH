@@ -188,6 +188,7 @@ class Measurement:
     dependencies: tuple[str, ...] = ()
     validation_status: ValidationStatus = ValidationStatus.NOT_RUN
     confidence_breakdown: ConfidenceBreakdown | None = None
+    calibration: Any | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
