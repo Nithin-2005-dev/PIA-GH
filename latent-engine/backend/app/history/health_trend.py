@@ -23,3 +23,7 @@ class HealthTrend:
     slope: float
 
     direction: TrendDirection
+
+    sample_size: int = 1
+
+    variance: float = 0.0

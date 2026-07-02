@@ -172,6 +172,36 @@ class ValidationMatrixEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class CausalRootCause:
+    """Summary of one confirmed root cause — stored in PlatformContext."""
+    subject: str
+    mechanism: str
+    mechanism_category: str
+    evidence_confidence: float
+    rule_confidence: float
+    propagation_confidence: float
+    overall_confidence: float
+    evidence_ids: tuple[str, ...]
+    rank: int
+
+
+@dataclass(frozen=True, slots=True)
+class CausalContextSummary:
+    """Top-level causal intelligence result stored in PlatformContext."""
+    root_causes: tuple[CausalRootCause, ...]
+    primary_cause: str
+    explanation: str
+    overall_confidence: float
+    overall_uncertainty: float
+    rejected_hypotheses: tuple[str, ...]   # rejection reason strings
+    intervention_effects: tuple[str, ...]  # human-readable effect descriptions
+    explanation_quality: str               # "PASS" | "PARTIAL" | "FAIL"
+    total_mechanisms_activated: int
+    total_hypotheses_evaluated: int
+    total_hypotheses_accepted: int
+
+
+@dataclass(frozen=True, slots=True)
 class OrgIntelligenceResult:
     """
     Complete organizational intelligence report produced by stage08.
@@ -221,6 +251,7 @@ class PlatformContext:
     forecast_context: ForecastContext | None = None
     simulation_context: SimulationContext | None = None
     org_intelligence: OrgIntelligenceResult | None = None
+    causal_context: CausalContextSummary | None = None
     reasoning_results: list[ReasoningResult] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)
 

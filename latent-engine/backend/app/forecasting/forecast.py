@@ -22,3 +22,5 @@ class Forecast:
     slope: float
 
     risk_level: str
+
+    confidence: float = 0.5

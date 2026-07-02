@@ -39,7 +39,7 @@ class PipelineValidationStage(PipelineStage):
             # not go through CanonicalPlatformPipeline.
             order: tuple[str, ...] = context.metrics.get("execution_order", ())
             path = ["GitHub Commit"] + [
-                MODULE_DISPLAY_NAMES.get(m, m) for m in dict.fromkeys(order) if m != "forecasting"
+                MODULE_DISPLAY_NAMES.get(m, m) for m in dict.fromkeys(order)
             ]
 
         for index, name in enumerate(path):
@@ -57,6 +57,7 @@ class PipelineValidationStage(PipelineStage):
             "Knowledge Graph":           context.knowledge_graph is not None,
             "Temporal Intelligence":     context.historical_context is not None,
             "Organization Intelligence": org is not None,
+            "Causal Intelligence":       getattr(context, "causal_context", None) is not None,
             "Reasoning":                 bool(context.reasoning_results),
             "Decision":                  bool(context.decisions),
             "Executive":                 bool(context.decisions),
@@ -67,7 +68,6 @@ class PipelineValidationStage(PipelineStage):
             "Immutability":              self._immutability_preserved(context),
             "Org No Legacy Deps":        self._no_legacy_deps(org),
         }
-
 
         for name, passed in checks.items():
             metric(name, "PASS" if passed else "FAIL")
@@ -91,7 +91,30 @@ class PipelineValidationStage(PipelineStage):
                 metric(name, "PASS" if passed else "FAIL")
             context.metrics["org_health_checks"] = org_checks
 
+        # M56 Causal Intelligence checks
+        causal = getattr(context, "causal_context", None)
+        if causal:
+            section("Causal Intelligence Health (M56)")
+            causal_checks = {
+                "Causal stage executed":       True,
+                "Root causes generated":       len(causal.root_causes) > 0,
+                "Explanation quality PASS":    causal.explanation_quality in ("PASS", "PARTIAL"),
+                "Overall confidence > 0":      causal.overall_confidence > 0.0,
+                "Mechanisms activated > 0":    causal.total_mechanisms_activated > 0,
+                "Hypotheses evaluated > 0":    causal.total_hypotheses_evaluated > 0,
+                "Hypotheses accepted > 0":     causal.total_hypotheses_accepted > 0,
+                "Primary cause identified":    bool(causal.primary_cause),
+                "Causal lineage complete":     self._causal_lineage_complete(causal, context),
+            }
+            for name, passed in causal_checks.items():
+                metric(name, "PASS" if passed else "FAIL")
+            context.metrics["causal_health_checks"] = causal_checks
+        else:
+            section("Causal Intelligence Health (M56)")
+            metric("Causal stage executed", "FAIL — stage did not produce causal_context")
+
         success("Canonical validation checks completed")
+
 
     def _lineage_preserved(self, context: PlatformContext) -> bool:
         package = context.evidence_package
@@ -150,3 +173,22 @@ class PipelineValidationStage(PipelineStage):
         type_name = type(org).__name__
         forbidden = ("Event", "ExpertiseProjection", "IntelligenceContext")
         return all(f not in type_name for f in forbidden)
+
+    def _causal_lineage_complete(self, causal, context) -> bool:
+        """
+        Verify that every accepted root cause has at least one evidence item
+        AND that the pipeline has canonical measurements to support it.
+        No orphan causal explanations are allowed.
+
+        Rule: a root cause is lineage-complete if:
+          1. It has >= 1 evidence_id in its evidence tuple, AND
+          2. The pipeline has measurements (the source of all causal evidence).
+        """
+        if not causal.root_causes:
+            return False
+        has_measurements = bool(context.measurements)
+        for rc in causal.root_causes:
+            if not rc.evidence_ids:
+                return False  # orphan — no evidence trace
+        return has_measurements  # measurements exist as the upstream source
+

@@ -112,31 +112,21 @@ def _proxies_from_expertise(
 def _compute_ownership(
     proxies_by_subject: dict[str, list[_ExpertiseProxy]],
 ) -> list[OwnershipEntry]:
-    """
-    For each subject group compute proportional ownership using the
-    same algorithm as ExpertiseOwnershipPolicy (no import needed):
-
-        ownership_percentage = expert.effective_score / total_score
-
-    Thresholds:
-        >= 0.60  → PRIMARY
-        >= 0.20  → SECONDARY
-        else     → CONTRIBUTOR
-    """
+    import math
     entries: list[OwnershipEntry] = []
 
     for subject, group in proxies_by_subject.items():
-        total_score = sum(p.effective_score for p in group)
+        total_score = sum(math.log1p(max(0, p.effective_score)) for p in group)
         if total_score == 0:
             continue
 
         category = group[0].category if group else "unknown"
 
         for proxy in group:
-            pct = proxy.effective_score / total_score
-            if pct >= 0.60:
+            pct = math.log1p(max(0, proxy.effective_score)) / total_score
+            if pct >= 0.40:
                 level = "PRIMARY"
-            elif pct >= 0.20:
+            elif pct >= 0.15:
                 level = "SECONDARY"
             else:
                 level = "CONTRIBUTOR"
@@ -872,7 +862,9 @@ class OrganizationIntelligenceStage(PipelineStage):
         self._display_lineage(context.expertise_models, knowledge_risks, bus_factors)
         self._display_validation_matrix(validation_matrix)
         self._display_native_rewrite(native_rewrite)
+        self._display_causal_context(context)          # M56: causal root causes
         success("Organization Intelligence produced from canonical pipeline outputs")
+
 
     # ------------------------------------------------------------------
     # Display helpers
@@ -1000,6 +992,51 @@ class OrganizationIntelligenceStage(PipelineStage):
                 ],
             )
 
+    def _display_causal_context(self, context) -> None:
+        """Display causal root causes enriching the org intelligence output."""
+        causal = getattr(context, "causal_context", None)
+        if not causal or not causal.root_causes:
+            return
+
+        section("Causal Root Cause Analysis (M56)")
+        metric("Primary Root Cause",        causal.primary_cause)
+        metric("Root Causes Identified",    len(causal.root_causes))
+        metric("Mechanisms Activated",      causal.total_mechanisms_activated)
+        metric("Hypotheses Evaluated",      causal.total_hypotheses_evaluated)
+        metric("Hypotheses Accepted",       causal.total_hypotheses_accepted)
+        metric("Overall Confidence",        f"{causal.overall_confidence*100:.1f}%")
+        metric("Explanation Quality",       causal.explanation_quality)
+
+        ranking(
+            "Root Causes — Ranked by Confidence",
+            [
+                (
+                    f"[{rc.rank}] {rc.subject:<36} "
+                    f"overall={rc.overall_confidence*100:.0f}%  "
+                    f"evidence={rc.evidence_confidence*100:.0f}%  "
+                    f"rule={rc.rule_confidence*100:.0f}%  "
+                    f"propagation={rc.propagation_confidence*100:.0f}%  "
+                    f"[{rc.mechanism_category}]"
+                )
+                for rc in causal.root_causes
+            ],
+        )
+
+        if causal.intervention_effects:
+            ranking(
+                "Causal Intervention Effects",
+                [
+                    f"  {effect}"
+                    for effect in causal.intervention_effects
+                ],
+            )
+
+        if causal.rejected_hypotheses:
+            ranking(
+                "Alternative Hypotheses (Rejected)",
+                [f"  x  {reason}" for reason in causal.rejected_hypotheses[:5]],
+            )
+
     def _display_health(self, health: OrgHealthSummary) -> None:
         section("Organization Health")
         metric("Average Health",   f"{health.average_health:.3f}")
@@ -1009,6 +1046,7 @@ class OrganizationIntelligenceStage(PipelineStage):
         metric("Warning Topics",   health.warning_count)
         metric("Critical Topics",  health.critical_count)
         metric("Total Topics",     health.total_subjects)
+
 
     def _display_forecast(self, note: str) -> None:
         section("Forecast")

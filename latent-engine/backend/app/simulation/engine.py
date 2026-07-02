@@ -68,6 +68,16 @@ class SimulationEngine:
         if hasattr(cloned, "metrics"):
             cloned.metrics = copy.deepcopy(cloned.metrics)
 
+        # Deep copy evidence package to allow isolated interventions
+        if hasattr(cloned, "evidence_package") and cloned.evidence_package is not None:
+            cloned.evidence_package = copy.deepcopy(cloned.evidence_package)
+
+        if hasattr(cloned, "org_intelligence") and cloned.org_intelligence is not None:
+            cloned.org_intelligence = copy.deepcopy(cloned.org_intelligence)
+
+        if hasattr(cloned, "forecast_context") and cloned.forecast_context is not None:
+            cloned.forecast_context = copy.deepcopy(cloned.forecast_context)
+
         return cloned
 
 

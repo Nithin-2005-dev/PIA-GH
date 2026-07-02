@@ -22,11 +22,14 @@ class ExpertiseOwnershipPolicy(
         experts: list[QueryResult],
     ) -> list[OwnershipEstimate]:
 
+        import math
+
         if not experts:
             return []
 
+        # Use log normalization to prevent winner-takes-all collapsing
         total_score = sum(
-            expert.effective_score
+            math.log1p(max(0, expert.effective_score))
             for expert in experts
         )
 
@@ -38,27 +41,17 @@ class ExpertiseOwnershipPolicy(
         for expert in experts:
 
             ownership_percentage = (
-                expert.effective_score
+                math.log1p(max(0, expert.effective_score))
                 / total_score
             )
 
-            if ownership_percentage >= 0.60:
-
-                level = (
-                    OwnershipLevel.PRIMARY
-                )
-
-            elif ownership_percentage >= 0.20:
-
-                level = (
-                    OwnershipLevel.SECONDARY
-                )
-
+            # Softer thresholds due to log smoothing
+            if ownership_percentage >= 0.40:
+                level = OwnershipLevel.PRIMARY
+            elif ownership_percentage >= 0.15:
+                level = OwnershipLevel.SECONDARY
             else:
-
-                level = (
-                    OwnershipLevel.CONTRIBUTOR
-                )
+                level = OwnershipLevel.CONTRIBUTOR
 
             ownership.append(
                 OwnershipEstimate(

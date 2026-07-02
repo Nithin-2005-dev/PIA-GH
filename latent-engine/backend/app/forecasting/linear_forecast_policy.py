@@ -39,16 +39,21 @@ class LinearForecastPolicy(
         )
 
         if predicted_health >= 75:
-
             risk = "SAFE"
-
         elif predicted_health >= 50:
-
             risk = "WARNING"
-
         else:
-
             risk = "CRITICAL"
+
+        # Dynamically calculate confidence based on sample size and variance
+        # Max confidence if sample_size > 30 and variance is low.
+        base_confidence = min(1.0, trend.sample_size / 30.0)
+        
+        # Penalize confidence if variance is high (e.g. noisy data)
+        # Assuming variance of health score is typically 0 to 1000 (since max diff is 100).
+        variance_penalty = min(0.5, trend.variance / 1000.0)
+        
+        confidence = max(0.1, base_confidence - variance_penalty)
 
         return Forecast(
             module_ref=(
@@ -63,4 +68,5 @@ class LinearForecastPolicy(
             horizon=horizon,
             slope=trend.slope,
             risk_level=risk,
+            confidence=confidence,
         )

@@ -66,17 +66,25 @@ class TrendAnalyzer:
                 TrendDirection.STABLE
             )
 
+        sample_size = len(snapshots)
+
+        # Calculate residual variance
+        mean_score = sum(s.health_score for s in snapshots) / sample_size
+        variance = sum((s.health_score - mean_score) ** 2 for s in snapshots) / sample_size
+
         return HealthTrend(
-        module_ref=(
-            history.module_ref
-        ),
-        previous_score=(
-            first.health_score
-        ),
-        current_score=(
-            last.health_score
-        ),
-        delta=delta,
-        slope=slope,
-        direction=direction,
-    )
+            module_ref=(
+                history.module_ref
+            ),
+            previous_score=(
+                first.health_score
+            ),
+            current_score=(
+                last.health_score
+            ),
+            delta=delta,
+            slope=slope,
+            direction=direction,
+            sample_size=sample_size,
+            variance=variance,
+        )

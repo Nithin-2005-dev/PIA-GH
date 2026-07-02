@@ -55,14 +55,24 @@ class OwnershipBusFactorPolicy(
             coverage += (
                 owner.ownership_percentage
             )
-
             count += 1
 
-            if (
-                coverage
-                >= self._coverage_threshold
-            ):
-                break
+            # Relax the strict threshold: ensure we count at least anyone who is a primary/secondary owner,
+            # or continue until we hit the threshold.
+            if coverage >= self._coverage_threshold:
+                # But don't exclude a secondary owner just because they put us over 80%.
+                # Look ahead to see if the next owner has significant percentage (e.g. > 15%).
+                pass # Handled below by looking at the remaining list.
+
+        # New approach: count any owner with > 15% ownership.
+        # This matches the ExpertiseOwnershipPolicy's SECONDARY threshold.
+        count = sum(1 for owner in sorted_ownership if owner.ownership_percentage >= 0.15)
+        # Fallback in case everyone is tiny
+        if count == 0 and sorted_ownership:
+            count = 1
+
+        # Recalculate true coverage of the bus factor group
+        coverage = sum(owner.ownership_percentage for owner in sorted_ownership[:count])
 
         if count == 1:
 

@@ -237,6 +237,8 @@ class CanonicalPlatformPipeline:
                 continue
             if binding.module == "simulation" or binding.stage.__class__.__name__ == "SimulationStage":
                 continue
+            if binding.stage.__class__.__name__ == "CausalIntelligenceStage":
+                continue
 
             try:
                 binding.stage.run(cloned)
@@ -278,6 +280,7 @@ class CanonicalPlatformPipeline:
         from scripts.platform_showcase.stages.stage09_reasoning import ReasoningStage
         from scripts.platform_showcase.stages.stage10_decision import DecisionStage
         from scripts.platform_showcase.stages.stage10b_optimization import PortfolioOptimizationStage
+        from scripts.platform_showcase.stages.stage10c_causal import CausalIntelligenceStage
         from scripts.platform_showcase.stages.stage11_executive import ExecutiveDashboardStage
         from scripts.platform_showcase.stages.stage12_validation import PipelineValidationStage
         from scripts.platform_showcase.stages.stage13_summary import SummaryStage
@@ -351,9 +354,9 @@ class CanonicalPlatformPipeline:
                     "PlatformContext.historical_context",
                 ),
             ),
-            "forecast": (
+            "forecasting": (
                 CanonicalStageBinding(
-                    "forecast",
+                    "forecasting",
                     ForecastingStage(),
                     "PlatformContext.historical_context",
                     "PlatformContext.forecast_context",
@@ -373,6 +376,14 @@ class CanonicalPlatformPipeline:
                     OrganizationIntelligenceStage(),
                     "PlatformContext.forecast_context",
                     "PlatformContext.org_intelligence",
+                ),
+            ),
+            "causal": (
+                CanonicalStageBinding(
+                    "causal",
+                    CausalIntelligenceStage(),
+                    "PlatformContext.org_intelligence + forecast_context + simulation_context",
+                    "PlatformContext.causal_context",
                 ),
             ),
             "agent": (

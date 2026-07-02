@@ -90,9 +90,10 @@ MODULE_DISPLAY_NAMES: dict[str, str] = {
     "knowledge": "Knowledge Layer",
     "graph": "Knowledge Graph Layer",
     "temporal": "Temporal Intelligence",
-    "forecast": "Forecasting Layer",
+    "forecasting": "Forecasting Layer",
     "simulation": "Counterfactual Simulation Layer",
     "intelligence": "Organization Intelligence",
+    "causal": "Causal Intelligence",
     "agent": "Reasoning Layer",
     "decision": "Decision Layer",
     "executive": "Executive Intelligence Report",
@@ -112,17 +113,14 @@ def banner(runtime):
     
     print(" GitHub")
     for module_name in order:
-        if module_name == "forecasting": 
-            continue  # Skip legacy duplicate
-            
         display_name = MODULE_DISPLAY_NAMES.get(module_name, f"{module_name.title()} Layer")
         
         # Apply specific colors for emphasis
         if module_name == "graph":
             display_name = c(display_name, Color.CYAN)
-        elif module_name in ("temporal", "forecast", "simulation"):
+        elif module_name in ("temporal", "forecasting", "simulation"):
             display_name = c(display_name, Color.YELLOW)
-        elif module_name == "intelligence":
+        elif module_name in ("intelligence", "causal"):
             display_name = c(display_name, Color.MAGENTA)
             
         print("    |")
@@ -306,7 +304,7 @@ def summary(title: str, rows: list[tuple[str, Any]]):
 # Lineage — traces canonical flow from Decision back to GitHub
 # ============================================================================
 
-def lineage(title: str):
+def lineage(title: str, path: list[str] = None):
 
     blank()
 
@@ -314,37 +312,24 @@ def lineage(title: str):
 
     print()
 
-    print(" GitHub Commit")
-    print("      |")
-    print("      v")
-    print(" Observation")
-    print("      |")
-    print("      v")
-    print(" Measurement")
-    print("      |")
-    print("      v")
-    print(" Evidence")
-    print("      |")
-    print("      v")
-    print(" Expertise")
-    print("      |")
-    print("      v")
-    print(" Knowledge")
-    print("      |")
-    print("      v")
-    print(c(" Knowledge Graph", Color.CYAN))
-    print("      |")
-    print("      v")
-    print(c(" Temporal Intelligence", Color.YELLOW))
-    print("      |")
-    print("      v")
-    print(c(" Organization Intelligence", Color.MAGENTA))
-    print("      |")
-    print("      v")
-    print(" Reasoning")
-    print("      |")
-    print("      v")
-    print(" Decision")
+    if not path:
+        print("  (Path unavailable)")
+        return
+
+    print(f" {path[0]}")
+    for step in path[1:]:
+        print("      |")
+        print("      v")
+        
+        # Apply specific colors for emphasis
+        if "Graph" in step:
+            step = c(step, Color.CYAN)
+        elif step in ("Temporal Intelligence", "Forecasting Layer", "Counterfactual Simulation Layer"):
+            step = c(step, Color.YELLOW)
+        elif step in ("Organization Intelligence", "Causal Intelligence"):
+            step = c(step, Color.MAGENTA)
+            
+        print(f" {step}")
 
 
 # ============================================================================

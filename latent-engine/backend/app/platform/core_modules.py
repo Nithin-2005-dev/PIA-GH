@@ -357,11 +357,13 @@ class KnowledgePlatformModule(BaseModule):
     )
 
 
-class ForecastPlatformModule(BaseModule):
-    name = "forecast"
+class ForecastingPlatformModule(BaseModule):
+    name = "forecasting"
     version = "1.0"
-    dependencies = ("temporal",)
+    dependencies = ("temporal", "estimation",)
     capabilities = (
+        "forecasting.model",
+        "forecasting.pipeline",
         "forecast.engine",
         "forecast.models",
     )
@@ -370,6 +372,10 @@ class ForecastPlatformModule(BaseModule):
         self,
         services: ServiceCollection,
     ) -> None:
+        from app.forecasting.forecast_service import ForecastService
+        from app.forecasting.validation import ForecastValidationService
+        from app.forecasting.linear_forecast_policy import LinearForecastPolicy
+
         from app.forecast.baseline_models import (
             ConstantBaselineModel,
             ExponentialSmoothingModel,
@@ -379,6 +385,25 @@ class ForecastPlatformModule(BaseModule):
         )
         from app.forecast.engine import ForecastEngine, ForecastRegistry
         from app.forecast.factory import TimeSeriesFactory
+
+        # Register forecasting services
+        services.add(
+            LinearForecastPolicy,
+            LinearForecastPolicy,
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ForecastService,
+            lambda provider: ForecastService(
+                provider.resolve(LinearForecastPolicy)
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ForecastValidationService,
+            lambda _: ForecastValidationService(),
+            scope=ServiceScope.SINGLETON,
+        )
 
         # Register baseline models
         services.add(LinearTrendModel, lambda _: LinearTrendModel(), scope=ServiceScope.SINGLETON)
@@ -414,47 +439,11 @@ class ForecastPlatformModule(BaseModule):
         )
 
 
-class ForecastingPlatformModule(BaseModule):
-    name = "forecasting"
-    version = "1.0"
-    dependencies = ("estimation",)
-    capabilities = (
-        "forecasting.model",
-        "forecasting.pipeline",
-    )
-
-    def configure_services(
-        self,
-        services: ServiceCollection,
-    ) -> None:
-        from app.forecasting.forecast_service import ForecastService
-        from app.forecasting.validation import ForecastValidationService
-        from app.forecasting.linear_forecast_policy import LinearForecastPolicy
-
-        services.add(
-            LinearForecastPolicy,
-            LinearForecastPolicy,
-            scope=ServiceScope.SINGLETON,
-        )
-        services.add(
-            ForecastService,
-            lambda provider: ForecastService(
-                provider.resolve(LinearForecastPolicy)
-            ),
-            scope=ServiceScope.SINGLETON,
-        )
-        services.add(
-            ForecastValidationService,
-            lambda _: ForecastValidationService(),
-            scope=ServiceScope.SINGLETON,
-        )
-
-
 class SimulationPlatformModule(BaseModule):
     name = "simulation"
     version = "1.0"
     dependencies = (
-        "forecast",
+        "forecasting",
     )
     capabilities = (
         "simulation.engine",
@@ -508,6 +497,73 @@ class AgentPlatformModule(BaseModule):
         services.add(
             IntentClassifier,
             IntentClassifier,
+            scope=ServiceScope.SINGLETON,
+        )
+
+
+
+class CausalPlatformModule(BaseModule):
+    name = "causal"
+    version = "1.0"
+    dependencies = (
+        "intelligence",
+    )
+    capabilities = (
+        "causal.engine",
+        "causal.explanation",
+    )
+
+    def configure_services(
+        self,
+        services: ServiceCollection,
+    ) -> None:
+        from app.causal.ontology import CausalOntology
+        from app.causal.graph import CausalSemanticModelBuilder
+        from app.causal.rules import CausalRuleRegistry, default_rule_registry
+        from app.causal.rules import CausalRuleEngine
+        from app.causal.hypothesis import CausalHypothesisEngine
+        from app.causal.explanation import ExplanationEngine
+        from app.causal.engine import CausalEngine
+
+        services.add(
+            CausalOntology,
+            lambda _: CausalOntology(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            CausalRuleRegistry,
+            lambda _: default_rule_registry(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            CausalRuleEngine,
+            lambda provider: CausalRuleEngine(provider.resolve(CausalRuleRegistry)),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            CausalSemanticModelBuilder,
+            lambda provider: CausalSemanticModelBuilder(
+                rule_engine=provider.resolve(CausalRuleEngine),
+                ontology=provider.resolve(CausalOntology),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            CausalHypothesisEngine,
+            lambda provider: CausalHypothesisEngine(provider.resolve(CausalOntology)),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            ExplanationEngine,
+            lambda _: ExplanationEngine(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            CausalEngine,
+            lambda provider: CausalEngine(
+                ontology=provider.resolve(CausalOntology),
+                rule_registry=provider.resolve(CausalRuleRegistry),
+            ),
             scope=ServiceScope.SINGLETON,
         )
 
@@ -580,8 +636,7 @@ class IntelligencePlatformModule(BaseModule):
     name = "intelligence"
     version = "1.0"
     dependencies = (
-        "forecast",
-        "forecasting",  # Legacy dependency kept for backwards compatibility
+        "forecasting",
         "simulation",
     )
     capabilities = (
@@ -820,8 +875,7 @@ class IntelligencePlatformModule(BaseModule):
             )
 
 
-def default_platform_modules(
-) -> tuple[BaseModule, ...]:
+def default_platform_modules() -> tuple[BaseModule, ...]:
     return (
         ObservationPlatformModule(),
         MeasurementPlatformModule(),
@@ -830,10 +884,10 @@ def default_platform_modules(
         KnowledgePlatformModule(),
         GraphPlatformModule(),
         TemporalPlatformModule(),
-        ForecastPlatformModule(),
-        IntelligencePlatformModule(),
         ForecastingPlatformModule(),
         SimulationPlatformModule(),
+        IntelligencePlatformModule(),
+        CausalPlatformModule(),
         AgentPlatformModule(),
         DecisionPlatformModule(),
         ExecutivePlatformModule(),

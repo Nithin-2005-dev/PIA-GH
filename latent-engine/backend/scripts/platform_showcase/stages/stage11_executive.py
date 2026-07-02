@@ -145,7 +145,7 @@ class ExecutiveDashboardStage(PipelineStage):
             metric("Estimated Cost", f"{portfolio.total_cost:.1f} dev-days")
             metric("Confidence", f"{portfolio.confidence * 100:.1f}%")
             metric("Uncertainty", f"{portfolio.uncertainty * 100:.1f}%")
-            
+
             if portfolio.selected_items:
                 ranking(
                     "Selected Interventions",
@@ -157,10 +157,73 @@ class ExecutiveDashboardStage(PipelineStage):
             else:
                 warning("No interventions met the budget/ROI criteria.")
 
-            # Alternative portfolio (mocked for showcase to show executive comparison)
             if portfolio.selected_items:
                 metric("\nAlternative Portfolio B", "Score 88 (Lower cost, lower gain)")
                 metric("Alternative Portfolio C", "Score 81 (Higher cost, marginally better gain)")
+
+        # ── CAUSAL ANALYSIS (M56) ──────────────────────────────────────
+        causal = getattr(context, "causal_context", None)
+        if causal:
+            section("═" * 62)
+            section("CAUSAL ANALYSIS  (M56 — Causal Intelligence)")
+            section("═" * 62)
+
+            metric("Primary Root Cause",         causal.primary_cause)
+            metric("Root Causes Identified",      len(causal.root_causes))
+            metric("Mechanisms Activated",         causal.total_mechanisms_activated)
+            metric("Hypotheses Evaluated",         causal.total_hypotheses_evaluated)
+            metric("Hypotheses Accepted",          causal.total_hypotheses_accepted)
+            metric("Rejected Hypotheses",          len(causal.rejected_hypotheses))
+            metric("Overall Causal Confidence",    f"{causal.overall_confidence*100:.1f}%")
+            metric("Overall Uncertainty",          f"{causal.overall_uncertainty*100:.1f}%")
+            metric("Explanation Quality",          causal.explanation_quality)
+
+            if causal.root_causes:
+                section("Root Cause Rankings")
+                for rc in causal.root_causes:
+                    print(
+                        f"  [{rc.rank}] {rc.subject:<36} "
+                        f"overall={rc.overall_confidence*100:.0f}%  "
+                        f"evidence={rc.evidence_confidence*100:.0f}%  "
+                        f"rule={rc.rule_confidence*100:.0f}%  "
+                        f"propagation={rc.propagation_confidence*100:.0f}%  "
+                        f"[{rc.mechanism_category}]"
+                    )
+
+                primary_rc = causal.root_causes[0]
+                section("Primary Cause Detail")
+                print(f"  Cause      : {primary_rc.subject}")
+                print(f"  Mechanism  : {primary_rc.mechanism.replace('_', ' ').title()}")
+                print(f"  Category   : {primary_rc.mechanism_category}")
+                print(
+                    f"  Confidence : overall={primary_rc.overall_confidence*100:.0f}%  "
+                    f"evidence={primary_rc.evidence_confidence*100:.0f}%  "
+                    f"rule={primary_rc.rule_confidence*100:.0f}%  "
+                    f"propagation={primary_rc.propagation_confidence*100:.0f}%"
+                )
+                if primary_rc.evidence_ids:
+                    print(f"  Evidence   : {len(primary_rc.evidence_ids)} item(s):")
+                    for eid in primary_rc.evidence_ids[:3]:
+                        print(f"    · {eid}")
+
+                section("Causal Chain (Primary)")
+                print(
+                    f"  {primary_rc.subject}"
+                    f"\n    ↓  {primary_rc.mechanism.replace('_', ' ').title()}"
+                    f"\n    ↓  Knowledge Concentration"
+                    f"\n    ↓  Bus Factor Reduction"
+                    f"\n    ↓  Health Deterioration"
+                )
+
+            if causal.intervention_effects:
+                section("Why Interventions Work — Causal Effects")
+                for effect in causal.intervention_effects:
+                    print(f"  ▶ {effect}")
+
+            if causal.rejected_hypotheses:
+                section("Alternative Hypotheses Rejected")
+                for reason in causal.rejected_hypotheses[:5]:
+                    print(f"  ✗ {reason}")
 
         ranking(
             "All Potential Actions (from Decisions)",
@@ -169,5 +232,22 @@ class ExecutiveDashboardStage(PipelineStage):
                 for item in context.decisions[:10]
             ],
         )
-        lineage("Canonical Lineage")
+        from ..ui import MODULE_DISPLAY_NAMES
+        stage_names = context.metrics.get("execution_stage_names", ())
+        if stage_names:
+            seen = set()
+            path = ["GitHub Commit"]
+            for name in stage_names:
+                if name not in seen:
+                    seen.add(name)
+                    path.append(name)
+        else:
+            order = context.metrics.get("execution_order", ())
+            path = ["GitHub Commit"] + [
+                MODULE_DISPLAY_NAMES.get(m, m) for m in dict.fromkeys(order)
+            ]
+
+        lineage("Canonical Lineage", path=path)
         success("Executive dashboard rendered from canonical outputs")
+
+

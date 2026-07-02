@@ -75,7 +75,6 @@ class InitializeStage(PipelineStage):
         display_names = [
             MODULE_DISPLAY_NAMES.get(m, m.title()) 
             for m in order 
-            if m != "forecasting"
         ]
         architecture_str = " -> ".join(display_names)
 
