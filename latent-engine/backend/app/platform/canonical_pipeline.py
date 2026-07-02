@@ -237,8 +237,6 @@ class CanonicalPlatformPipeline:
                 continue
             if binding.module == "simulation" or binding.stage.__class__.__name__ == "SimulationStage":
                 continue
-            if binding.stage.__class__.__name__ == "CausalIntelligenceStage":
-                continue
 
             try:
                 binding.stage.run(cloned)
