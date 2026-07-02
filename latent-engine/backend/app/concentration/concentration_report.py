@@ -18,4 +18,8 @@ class ConcentrationReport:
 
     concentration_score: float
 
+    concentration_uncertainty: float
+
+    concentration_confidence: float
+
     concentration_level: str

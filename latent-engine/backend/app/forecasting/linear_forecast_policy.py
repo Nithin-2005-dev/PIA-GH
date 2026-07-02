@@ -1,3 +1,5 @@
+import math
+
 from app.history.health_trend import (
     HealthTrend,
 )
@@ -45,15 +47,14 @@ class LinearForecastPolicy(
         else:
             risk = "CRITICAL"
 
-        # Dynamically calculate confidence based on sample size and variance
-        # Max confidence if sample_size > 30 and variance is low.
+        # M56.1 Statistical Confidence Formulation (CV + Horizon decay)
+        mean_health = max(1e-5, trend.current_score)
+        cv = math.sqrt(trend.variance) / mean_health
         base_confidence = min(1.0, trend.sample_size / 30.0)
         
-        # Penalize confidence if variance is high (e.g. noisy data)
-        # Assuming variance of health score is typically 0 to 1000 (since max diff is 100).
-        variance_penalty = min(0.5, trend.variance / 1000.0)
-        
-        confidence = max(0.1, base_confidence - variance_penalty)
+        # Exponential penalty based on CV and prediction horizon
+        confidence = base_confidence * math.exp(-0.5 * cv) * math.exp(-0.01 * horizon)
+        confidence = max(0.01, min(1.0, confidence))
 
         return Forecast(
             module_ref=(

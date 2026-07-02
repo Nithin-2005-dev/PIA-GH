@@ -16,6 +16,10 @@ class HealthReport:
 
     health_score: float
 
+    health_uncertainty: float
+
+    health_confidence: float
+
     health_level: str
 
     coverage_score: float

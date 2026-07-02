@@ -20,4 +20,8 @@ class CoverageReport:
 
     coverage_score: float
 
+    coverage_uncertainty: float
+
+    coverage_confidence: float
+
     coverage_level: str

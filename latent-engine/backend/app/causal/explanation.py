@@ -27,11 +27,20 @@ class ExplanationEngine:
         summary = self._build_summary(root_causes)
         quality = self._explanation_quality(root_causes, causal_ctx)
 
-        # Evidence coverage: fraction of org intel risk topics with a causal explanation
+        # Information Coverage Metric (M56.1 Enhancement)
         org = getattr(context, "org_intelligence", None)
-        total_risks = len(org.knowledge_risks) if org else 0
-        explained = min(len(root_causes), total_risks)
-        evidence_coverage = round(explained / total_risks, 4) if total_risks else 0.0
+        relevant_risks = sum(1 for r in org.knowledge_risks if r.risk_level == "HIGH") if org and hasattr(org, "knowledge_risks") else 0
+        
+        if not relevant_risks:
+            evidence_coverage = 1.0 # If no high risks exist, coverage is perfect by default
+        else:
+            # How many high risks have a causal explanation?
+            explained = min(len(root_causes), relevant_risks)
+            
+            # Weight coverage by the mean evidence confidence
+            mean_conf = sum(rc.confidence.evidence_confidence for rc in root_causes) / len(root_causes) if root_causes else 0.0
+            
+            evidence_coverage = round((explained / relevant_risks) * mean_conf, 4)
 
         primary = root_causes[0] if root_causes else self._unknown_cause()
         secondary = root_causes[1:] if len(root_causes) > 1 else ()

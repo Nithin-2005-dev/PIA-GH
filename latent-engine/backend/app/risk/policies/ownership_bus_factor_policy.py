@@ -19,6 +19,9 @@ class OwnershipBusFactorPolicy(
     BusFactorPolicy
 ):
 
+    HIGH_RISK_THRESHOLD = 1
+    MEDIUM_RISK_THRESHOLD = 2
+
     def __init__(
         self,
         coverage_threshold: float = 0.8,
@@ -74,13 +77,40 @@ class OwnershipBusFactorPolicy(
         # Recalculate true coverage of the bus factor group
         coverage = sum(owner.ownership_percentage for owner in sorted_ownership[:count])
 
-        if count == 1:
+        # Calculate scientific concentration metrics
+        import math
+        shannon_entropy = 0.0
+        hhi = 0.0
+        
+        for owner in sorted_ownership:
+            p = owner.ownership_percentage
+            if p > 0:
+                shannon_entropy -= p * math.log2(p)
+                hhi += p * p
+
+        # Gini Coefficient
+        n = len(sorted_ownership)
+        if n > 1:
+            # sorted_ownership is sorted descending, we want ascending for standard Gini formula
+            ascending_ownership = list(reversed(sorted_ownership))
+            cumulative_sum = 0.0
+            cumulative_weighted_sum = 0.0
+            
+            for i, owner in enumerate(ascending_ownership, 1):
+                cumulative_sum += owner.ownership_percentage
+                cumulative_weighted_sum += i * owner.ownership_percentage
+                
+            gini_coefficient = (2.0 * cumulative_weighted_sum) / (n * cumulative_sum) - (n + 1.0) / n
+        else:
+            gini_coefficient = 0.0
+
+        if count <= self.HIGH_RISK_THRESHOLD:
 
             risk_level = (
                 RiskLevel.HIGH
             )
 
-        elif count == 2:
+        elif count <= self.MEDIUM_RISK_THRESHOLD:
 
             risk_level = (
                 RiskLevel.MEDIUM
@@ -98,5 +128,10 @@ class OwnershipBusFactorPolicy(
             ),
             value=count,
             coverage=coverage,
+            shannon_entropy=shannon_entropy,
+            gini_coefficient=gini_coefficient,
+            hhi=hhi,
+            uncertainty=0.05, # Default estimation uncertainty
+            confidence=0.95,
             risk_level=risk_level,
         )

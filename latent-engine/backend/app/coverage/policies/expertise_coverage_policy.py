@@ -13,6 +13,9 @@ class ExpertiseCoveragePolicy(
     CoveragePolicy
 ):
 
+    THRESHOLD_STRONG = 70.0
+    THRESHOLD_MODERATE = 40.0
+
     def _coverage_multiplier(
         self,
         expert_count: int,
@@ -61,6 +64,23 @@ class ExpertiseCoveragePolicy(
             ] = estimate.module_ref
 
         reports = []
+        if not module_scores:
+            return reports
+
+        # Calculate robust statistics for total expertise across the repository
+        import statistics
+        all_totals = [sum(scores) for scores in module_scores.values()]
+        median_expertise = statistics.median(all_totals)
+        
+        try:
+            q1 = statistics.quantiles(all_totals, n=4)[0]
+            q3 = statistics.quantiles(all_totals, n=4)[2]
+            iqr = q3 - q1
+        except Exception:
+            iqr = 0.0
+            
+        if iqr == 0.0:
+            iqr = median_expertise if median_expertise > 0 else 1.0
 
         for (
             module_id,
@@ -79,26 +99,44 @@ class ExpertiseCoveragePolicy(
                 total_expertise
                 / expert_count
             )
+            
+            # Robust scaling: center around median, scale by IQR.
+            # E.g. median -> 50, +1 IQR -> 75, -1 IQR -> 25
+            z_robust = (total_expertise - median_expertise) / iqr
+            
+            # Map z_robust to a 0-100 scale using a sigmoid-like or bounded mapping
+            # Let's map z_robust=0 to 50, z_robust=1 to 75, z_robust=2 to ~88
+            import math
+            base_score = 100.0 / (1.0 + math.exp(-z_robust))
 
+            # Multi-signal integration (placeholder for future metrics like documentation/review)
+            # Currently relies heavily on expertise with a diversity multiplier
             coverage_score = (
-                average_expertise
+                base_score
                 * self._coverage_multiplier(
                     expert_count
                 )
             )
+            
+            # Bound to 0-100
+            coverage_score = max(0.0, min(100.0, coverage_score))
 
             if (
-                coverage_score >= 70
+                coverage_score >= self.THRESHOLD_STRONG
             ):
                 level = "STRONG"
 
             elif (
-                coverage_score >= 40
+                coverage_score >= self.THRESHOLD_MODERATE
             ):
                 level = "MODERATE"
 
             else:
                 level = "WEAK"
+                
+            # Compute confidence based on expert count (more experts = more confident signal)
+            confidence = min(1.0, 0.5 + (expert_count * 0.1))
+            uncertainty = 1.0 - confidence
 
             reports.append(
                 CoverageReport(
@@ -116,6 +154,8 @@ class ExpertiseCoveragePolicy(
                     coverage_score=(
                         coverage_score
                     ),
+                    coverage_uncertainty=uncertainty,
+                    coverage_confidence=confidence,
                     coverage_level=(
                         level
                     ),

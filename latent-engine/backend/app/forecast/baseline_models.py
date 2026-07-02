@@ -140,7 +140,12 @@ class LinearTrendModel:
                 )
             )
 
-        confidence_score = max(0.1, 1.0 - (variance / (abs(sum_y/n) + 1e-5)))
+        # M56.1 Statistical Confidence Formulation (CV + Horizon decay)
+        mean_y = abs(sum_y/n)
+        cv = math.sqrt(variance) / (mean_y + 1e-5) # Coefficient of Variation
+        base_conf = min(1.0, n / 10.0) # Penalty for very short histories
+        # exp(-alpha * CV) * exp(-beta * horizon) -> we apply decay per point later, but this is the baseline confidence of the series
+        confidence_score = base_conf * math.exp(-0.5 * cv)
 
         return ForecastSeries(
             metric_name=series.metric_name,
@@ -206,8 +211,11 @@ class MovingAverageModel:
                     ),
                 )
             )
-
-        confidence_score = min(0.9, max(0.1, 1.0 - (variance / (abs(ma) + 1e-5))))
+        # M56.1 Statistical Confidence Formulation (CV + Horizon decay)
+        mean_y = abs(ma)
+        cv = math.sqrt(variance) / (mean_y + 1e-5) # Coefficient of Variation
+        base_conf = min(1.0, series.history_length / 10.0)
+        confidence_score = base_conf * math.exp(-0.5 * cv)
 
         return ForecastSeries(
             metric_name=series.metric_name,
@@ -293,8 +301,11 @@ class MomentumProjectionModel:
                 )
             )
 
-        variance = abs(acceleration)
-        confidence_score = min(0.9, max(0.1, 1.0 - (variance / (abs(current_vel) + 1e-5))))
+        variance = abs(acceleration)        # M56.1 Statistical Confidence Formulation (CV + Horizon decay)
+        mean_y = abs(current_vel)
+        cv = math.sqrt(variance) / (mean_y + 1e-5) # Coefficient of Variation
+        base_conf = min(1.0, len(series.points) / 10.0)
+        confidence_score = base_conf * math.exp(-0.5 * cv)
 
         return ForecastSeries(
             metric_name=series.metric_name,
@@ -357,8 +368,11 @@ class ExponentialSmoothingModel:
                 )
             )
 
-        variance = abs(series.current - s)
-        confidence_score = min(0.9, max(0.1, 1.0 - (variance / (abs(s) + 1e-5))))
+        variance = abs(series.current - s)        # M56.1 Statistical Confidence Formulation (CV + Horizon decay)
+        mean_y = abs(s)
+        cv = math.sqrt(variance) / (mean_y + 1e-5) # Coefficient of Variation
+        base_conf = min(1.0, series.history_length / 10.0)
+        confidence_score = base_conf * math.exp(-0.5 * cv)
 
         return ForecastSeries(
             metric_name=series.metric_name,
