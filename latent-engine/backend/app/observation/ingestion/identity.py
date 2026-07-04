@@ -8,6 +8,7 @@ class UnifiedDeveloperIdentity:
     developer_id: str
     display_name: str
     aliases: tuple[str, ...]
+    is_canonical: bool = True
 
 
 class UnifiedIdentityResolver:
@@ -50,9 +51,36 @@ class UnifiedIdentityResolver:
                 external_id,
             ),
             UnifiedDeveloperIdentity(
-                developer_id=external_id,
+                developer_id=f"UNRESOLVED_{external_id}",
                 display_name=external_id,
                 aliases=(external_id,),
+                is_canonical=False,
             ),
         )
+
+    def merge(
+        self,
+        primary_developer_id: str,
+        secondary_developer_id: str,
+    ) -> None:
+        """Merge a secondary developer's aliases into a primary developer identity."""
+        primary_identity = None
+        for identity in self._aliases.values():
+            if identity.developer_id == primary_developer_id:
+                primary_identity = identity
+                break
+                
+        if not primary_identity:
+            raise ValueError(f"Primary identity '{primary_developer_id}' not found.")
+            
+        keys_to_update = []
+        for key, identity in self._aliases.items():
+            if identity.developer_id == secondary_developer_id:
+                keys_to_update.append(key)
+                
+        if not keys_to_update:
+            raise ValueError(f"Secondary identity '{secondary_developer_id}' not found.")
+            
+        for key in keys_to_update:
+            self._aliases[key] = primary_identity
 

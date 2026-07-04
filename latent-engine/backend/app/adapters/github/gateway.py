@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from app.ports.event_query import EventQuery
 
 
+from typing import Iterator
+
 class GitHubGateway(ABC):
     """
     Boundary between our system and GitHub.
@@ -12,7 +14,7 @@ class GitHubGateway(ABC):
     def fetch_commits(
         self,
         query: EventQuery,
-    ) -> list[dict]:
+    ) -> Iterator[dict]:
         raise NotImplementedError
 
     @abstractmethod

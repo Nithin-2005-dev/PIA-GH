@@ -1,9 +1,11 @@
+from typing import Iterator
 from app.adapters.github.gateway import GitHubGateway
 from app.observation.adapters.github import GitHubObservationTranslator
 from app.observation.domain import Observation
 from app.observation.integration import observation_to_event
 from app.ports.event_query import EventQuery
 from app.ports.event_source_port import ObservationSourcePort
+from app.observation.ingestion.resilience import with_resilience
 
 
 class GitHubAdapter(ObservationSourcePort):
@@ -23,18 +25,23 @@ class GitHubAdapter(ObservationSourcePort):
         self._gateway = gateway
         self._translator = translator or GitHubObservationTranslator()
 
+    def is_circuit_open(self) -> bool:
+        """Check if the underlying gateway's circuit breaker is open."""
+        if hasattr(self._gateway, "circuit_breaker"):
+            return self._gateway.circuit_breaker.is_open()
+        return False
+
+    @with_resilience(max_retries=3, base_delay=1.0)
     def collect(
         self,
         query: EventQuery,
-    ) -> list[Observation]:
+    ) -> Iterator[Observation]:
         owner, repo = query.identifier.split("/")
-        raw_commits = self._gateway.fetch_commits(
+        raw_commits_generator = self._gateway.fetch_commits(
             query
         )
 
-        observations = []
-
-        for raw_commit in raw_commits:
+        for raw_commit in raw_commits_generator:
             sha = raw_commit[
                 "sha"
             ]
@@ -45,15 +52,11 @@ class GitHubAdapter(ObservationSourcePort):
                 sha=sha,
             )
 
-            observations.append(
-                self._translator.commit(
-                    raw_commit,
-                    details,
-                    repository=query.identifier,
-                )
+            yield self._translator.commit(
+                raw_commit,
+                details,
+                repository=query.identifier,
             )
-
-        return observations
 
     def collect_events(
         self,

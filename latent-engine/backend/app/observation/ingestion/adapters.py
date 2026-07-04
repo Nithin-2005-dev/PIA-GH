@@ -1,46 +1,67 @@
 from __future__ import annotations
 
-from typing import Protocol
-
+from typing import Type, Dict, Any, Callable
+from abc import ABC, abstractmethod
 from app.observation.ingestion.models import RawObservationRecord
 from app.observation.ingestion.models import SyncRequest
 from app.observation.ingestion.models import SyncCursor
 
 
-class ObservationAdapter(Protocol):
+class ObservationAdapter(ABC):
     name: str
     provider: str
     supported_record_types: tuple[str, ...]
 
+    @abstractmethod
     def fetch(
         self,
         request: SyncRequest,
     ) -> tuple[RawObservationRecord, SyncCursor]:
-        ...
+        raise NotImplementedError
 
 
 class AdapterRegistry:
-    def __init__(
+    def __init__(self):
+        self._factories: Dict[str, Callable[..., ObservationAdapter]] = {}
+        self._active_adapters: Dict[str, ObservationAdapter] = {}
+
+    def register_factory(
         self,
-    ):
-        self._adapters: dict[str, ObservationAdapter] = {}
+        name: str,
+        factory: Callable[..., ObservationAdapter],
+    ) -> None:
+        self._factories[name] = factory
+        
+    def instantiate(self, name: str, config: Dict[str, Any]) -> ObservationAdapter:
+        if name not in self._factories:
+            raise ValueError(f"No factory registered for adapter type '{name}'.")
+            
+        adapter = self._factories[name](**config)
+        
+        # Validation Check: Ensure it fulfills the ObservationAdapter protocol natively via ABC
+        if not issubclass(type(adapter), ObservationAdapter):
+            raise TypeError(f"Adapter '{name}' is broken: Must inherit from ObservationAdapter ABC.")
+            
+        self._active_adapters[adapter.name] = adapter
+        return adapter
 
     def register(
         self,
         adapter: ObservationAdapter,
     ) -> None:
-        self._adapters[adapter.name] = adapter
+        """Legacy registration for already-instantiated adapters."""
+        self._active_adapters[adapter.name] = adapter
 
     def get(
         self,
         name: str,
     ) -> ObservationAdapter:
-        return self._adapters[name]
+        return self._active_adapters[name]
 
     def all(
         self,
     ) -> tuple[ObservationAdapter, ...]:
-        return tuple(self._adapters.values())
+        return tuple(self._active_adapters.values())
 
     def providers(
         self,
@@ -49,13 +70,13 @@ class AdapterRegistry:
             sorted(
                 {
                     adapter.provider
-                    for adapter in self._adapters.values()
+                    for adapter in self._active_adapters.values()
                 }
             )
         )
 
 
-class StaticObservationAdapter:
+class StaticObservationAdapter(ObservationAdapter):
     def __init__(
         self,
         name: str,

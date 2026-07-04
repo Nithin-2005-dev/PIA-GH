@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+import logging
 from uuid import NAMESPACE_URL
 from uuid import uuid5
+from typing import Any, Dict, Optional, List
+from pydantic import BaseModel, ValidationError, Field
+
+logger = logging.getLogger(__name__)
 
 from app.domain.entity_ref import EntityRef
 from app.domain.entity_type import EntityType
@@ -25,8 +30,27 @@ from app.observation.domain import PullRequestFacts
 from app.observation.domain import ReleaseFacts
 from app.observation.domain import ReviewFacts
 from app.observation.domain import TestFacts
+from app.observation.domain import ProcessingMode
 from app.observation.ingestion.identity import UnifiedIdentityResolver
 from app.observation.ingestion.models import RawObservationRecord
+
+
+class SchemaMismatchError(Exception):
+    """Raised when an incoming raw payload fails Pydantic schema validation."""
+    pass
+
+class BaseEventSchema(BaseModel):
+    """Semantic contract for incoming raw events."""
+    author: Optional[str] = Field(None, alias="user")
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
+    status: Optional[str] = None
+    state: Optional[str] = None
+    message: Optional[str] = None
+    
+    class Config:
+        extra = "allow"
+        populate_by_name = True
 
 
 class ObservationNormalizer:
@@ -40,6 +64,12 @@ class ObservationNormalizer:
         self,
         record: RawObservationRecord,
     ) -> Observation:
+        try:
+            # Validate schema contract
+            validated = BaseEventSchema(**record.payload)
+        except ValidationError as e:
+            raise SchemaMismatchError(f"Validation failed: {e}") from e
+
         payload = record.payload
         observation_type = ObservationType(record.record_type)
         facts = self._facts_for(
@@ -112,6 +142,7 @@ class ObservationNormalizer:
                 },
             ),
             facts=facts,
+            processing_mode=ProcessingMode.LIVE,
         )
 
     def _facts_for(
@@ -306,8 +337,16 @@ class ObservationNormalizer:
         if value is None:
             return default
         if isinstance(value, datetime):
+            if value.tzinfo is None:
+                logger.warning(f"Naive timestamp detected: {value}. Normalizing to UTC.")
+                return value.replace(tzinfo=timezone.utc)
             return value
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            logger.warning(f"Naive timestamp string detected: {value}. Normalizing to UTC.")
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
 
     def _stable_id(
         self,

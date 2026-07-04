@@ -49,6 +49,11 @@ class ObservationLifecycle(Enum):
     ARCHIVED = "archived"
 
 
+class ProcessingMode(str, Enum):
+    LIVE = "live"
+    REPLAY = "replay"
+
+
 @dataclass(frozen=True)
 class ObservationProvenance:
     source_platform: str
@@ -298,3 +303,4 @@ class Observation:
     provenance: ObservationProvenance
     context: ObservationContext
     facts: CanonicalFacts
+    processing_mode: ProcessingMode = ProcessingMode.LIVE

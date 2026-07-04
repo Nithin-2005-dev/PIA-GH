@@ -1,6 +1,7 @@
 from __future__ import annotations
+import dataclasses
 
-from app.observation.domain import Observation
+from app.observation.domain import Observation, ProcessingMode
 from app.observation.ingestion.models import ReplayQuery
 from app.observation.ingestion.storage import ObservationIngestionStore
 
@@ -36,6 +37,12 @@ class ObservationReplayEngine:
                 }
                 if query.developer not in actor_ids:
                     continue
-            results.append(observation)
+            
+            # Explicitly mark as replay to prevent the Infinite Mirror vulnerability
+            replayed_observation = dataclasses.replace(
+                observation,
+                processing_mode=ProcessingMode.REPLAY
+            )
+            results.append(replayed_observation)
         return tuple(results)
 
