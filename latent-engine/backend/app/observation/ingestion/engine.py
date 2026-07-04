@@ -167,9 +167,9 @@ class ObservationIngestionEngine:
                 payload = json.loads(row["payload"]) if isinstance(row["payload"], str) else row["payload"]
                 
                 # We need a proper record for the normalizer. In a real system, we serialize/deserialize it fully.
-                from app.observation.ingestion.models import RawObservationRecord, ObservationSource
+                from app.observation.ingestion.models import RawObservationRecord, ExternalSource
                 record = RawObservationRecord(
-                    source=ObservationSource(provider=row["source_id"], adapter="sqlite"),
+                    source=ExternalSource(provider=row["source_id"], adapter="sqlite"),
                     record_type="unknown", # We would store this in DB, but extracting from payload
                     record_id=row["external_event_id"],
                     payload=payload,

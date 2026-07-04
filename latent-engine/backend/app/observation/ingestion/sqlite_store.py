@@ -1,7 +1,8 @@
 import sqlite3
 import json
 from typing import Any, Dict, List, Optional
-from .interfaces import ICheckpointStore, IObservationStore, SyncCursor
+from app.observation.ingestion.models import SyncCursor
+from .interfaces import ICheckpointStore, IObservationStore
 
 class SQLiteCheckpointStore(ICheckpointStore):
     def __init__(self, db_path: str = "ingestion.db"):
@@ -9,21 +10,21 @@ class SQLiteCheckpointStore(ICheckpointStore):
         self._initialize_pragmas()
         
     def _initialize_pragmas(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
 
-    def get_cursor(self, source_id: str) -> Optional[SyncCursor]:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute("SELECT cursor_value FROM checkpoints WHERE source_id = ?", (source_id,))
+    def get(self, adapter: str) -> Optional[SyncCursor]:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
+            cursor = conn.execute("SELECT cursor_value FROM checkpoints WHERE source_id = ?", (adapter,))
             row = cursor.fetchone()
-            return SyncCursor(source_id, row[0]) if row else None
+            return SyncCursor(adapter=adapter, cursor=row[0]) if row else None
 
-    def update_cursor(self, source_id: str, cursor: SyncCursor) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+    def update_cursor(self, adapter: str, cursor: SyncCursor) -> None:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO checkpoints (source_id, cursor_value) VALUES (?, ?)",
-                (source_id, cursor.cursor_value)
+                (adapter, cursor.cursor)
             )
 
 class SQLiteObservationStore(IObservationStore):
@@ -32,13 +33,13 @@ class SQLiteObservationStore(IObservationStore):
         self._initialize_pragmas()
         
     def _initialize_pragmas(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
 
     def append_raw(self, source_id: str, external_id: str, payload: Dict[str, Any]) -> bool:
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with sqlite3.connect(self.db_path, uri=True) as conn:
                 conn.execute(
                     "INSERT INTO raw_observations (source_id, external_event_id, payload) VALUES (?, ?, ?)",
                     (source_id, external_id, json.dumps(payload))
@@ -49,7 +50,7 @@ class SQLiteObservationStore(IObservationStore):
             return False
 
     def claim_batch(self, batch_size: int = 100) -> List[Dict[str, Any]]:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
             conn.row_factory = sqlite3.Row
             # Use IMMEDIATE transaction to acquire a reserved lock, preventing other readers from acquiring it 
             # and preventing the Read-Modify-Write contention race condition.
@@ -81,21 +82,21 @@ class SQLiteObservationStore(IObservationStore):
             return [dict(row) for row in cursor.fetchall()]
 
     def mark_processed(self, row_id: int) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
             conn.execute(
                 "UPDATE raw_observations SET status = 2 WHERE id = ?",
                 (row_id,)
             )
 
     def append_dlq(self, payload: str, error_message: str, schema_version: str, traceback_str: Optional[str] = None) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
             conn.execute(
                 "INSERT INTO dead_letter_queue (original_payload, schema_version, error_message, traceback) VALUES (?, ?, ?, ?)",
                 (payload, schema_version, error_message, traceback_str)
             )
 
     def reset_stale_jobs(self) -> None:
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, uri=True) as conn:
             conn.execute(
                 "UPDATE raw_observations SET status = 0 WHERE status = 1 AND updated_at < datetime('now', '-1 hour')"
             )

@@ -1,6 +1,10 @@
 import time
 import logging
+import threading
 from enum import Enum, auto
+
+from pydantic import ValidationError
+from app.observation.ingestion.normalizer import SchemaMismatchError
 
 logger = logging.getLogger(__name__)
 
@@ -20,49 +24,68 @@ class CircuitBreaker:
         self.recovery_timeout_sec = recovery_timeout_sec
         self.failure_count = 0
         self.last_failure_time = 0.0
+        self.probing = False
+        self.lock = threading.Lock()
 
     def is_open(self) -> bool:
-        if self.state == CircuitState.CLOSED:
-            return False
-            
-        if self.state == CircuitState.OPEN:
-            # Check if it's time to test the circuit (HALF_OPEN)
-            if time.time() - self.last_failure_time >= self.recovery_timeout_sec:
-                self.state = CircuitState.HALF_OPEN
-                logger.info("CircuitBreaker entering HALF_OPEN state (probing).")
+        with self.lock:
+            if self.state == CircuitState.CLOSED:
                 return False
-            return True
-            
-        if self.state == CircuitState.HALF_OPEN:
-            # While half-open, only allow one probe at a time, but for simplicity here we return False.
-            # Real-world could use a lock to strictly allow ONE call.
-            return False
-            
+                
+            if self.state == CircuitState.OPEN:
+                if time.time() - self.last_failure_time >= self.recovery_timeout_sec:
+                    # Time to probe, but don't change state here. Just return False to let call() handle it.
+                    return False
+                return True
+                
+            if self.state == CircuitState.HALF_OPEN:
+                if self.probing:
+                    return True
+                return False
+                
         return False
 
     def record_success(self):
-        if self.state == CircuitState.HALF_OPEN:
-            logger.info("CircuitBreaker probe succeeded. Entering CLOSED state.")
-            self.state = CircuitState.CLOSED
-        self.failure_count = 0
+        with self.lock:
+            if self.state == CircuitState.HALF_OPEN:
+                logger.info("CircuitBreaker probe succeeded. Entering CLOSED state.")
+                self.state = CircuitState.CLOSED
+                self.probing = False
+            self.failure_count = 0
 
     def record_failure(self):
-        self.failure_count += 1
-        self.last_failure_time = time.time()
-        
-        if self.state == CircuitState.HALF_OPEN or self.failure_count >= self.failure_threshold:
-            logger.warning("CircuitBreaker tripped to OPEN state.")
-            self.state = CircuitState.OPEN
+        with self.lock:
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+            
+            if self.state == CircuitState.HALF_OPEN or self.failure_count >= self.failure_threshold:
+                logger.warning("CircuitBreaker tripped to OPEN state.")
+                self.state = CircuitState.OPEN
+                self.probing = False
 
     def call(self, func, *args, **kwargs):
         """Execute a function protected by the circuit breaker."""
-        if self.is_open():
-            raise CircuitOpenException(f"Circuit is OPEN. Try again after {self.recovery_timeout_sec}s.")
-            
+        with self.lock:
+            if self.state == CircuitState.OPEN:
+                if time.time() - self.last_failure_time >= self.recovery_timeout_sec:
+                    self.state = CircuitState.HALF_OPEN
+                    self.probing = True
+                else:
+                    raise CircuitOpenException(f"Circuit is OPEN. Try again after {self.recovery_timeout_sec}s.")
+            elif self.state == CircuitState.HALF_OPEN:
+                if self.probing:
+                    raise CircuitOpenException(f"Circuit is HALF_OPEN and currently probing. Wait.")
+                self.probing = True
+                
         try:
             result = func(*args, **kwargs)
             self.record_success()
             return result
+        except (SchemaMismatchError, ValidationError) as logic_error:
+            # Poison Pill Storm protection: business logic errors should NOT trip the circuit.
+            # We record a success for the network request itself, then re-raise the logic error.
+            self.record_success()
+            raise logic_error
         except Exception as e:
             self.record_failure()
             raise e
