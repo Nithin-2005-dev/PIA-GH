@@ -21,6 +21,7 @@ Expected Accuracy:
 """
 
 import math
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -36,8 +37,7 @@ from app.measurement.domain import MeasurementUncertainty
 from app.measurement.domain import NormalizationMethod
 from app.measurement.domain.catalog import DefaultMeasurementCatalog
 from app.measurement.evaluators.common import artifact_files
-from app.measurement.identity.resolver import DeveloperIdentityResolver
-from app.measurement.subsystem.boundary import SubsystemResolver
+from app.measurement.core.measurement_config import MeasurementConfig
 from app.observation.domain import Observation
 
 
@@ -54,6 +54,14 @@ def _gini(values: list[float]) -> float:
 
 class SubsystemActivityEvaluator(MeasurementEvaluator):
 
+    @property
+    def metric_name(self) -> str:
+        return "subsystem_activity"
+
+    @property
+    def logic_version(self) -> str:
+        return "v1.0.0"
+
     _REGISTRY = DefaultMeasurementCatalog.build()
 
     DIRECTORY_CHURN         = _REGISTRY.get("directory_churn")
@@ -64,8 +72,11 @@ class SubsystemActivityEvaluator(MeasurementEvaluator):
     SUBSYSTEM_COUPLING      = _REGISTRY.get("subsystem_coupling_score")
     SUBSYSTEM_VOLATILITY    = _REGISTRY.get("subsystem_volatility")
 
-    _subsystem_resolver = SubsystemResolver.default()
-    _identity_resolver  = DeveloperIdentityResolver()
+    def _extract_co_authors(self, message: str) -> list[str]:
+        if not message:
+            return []
+        pattern = re.compile(r'(?mi)^Co-authored-by:\s*.*?\s*<(.*?)>')
+        return pattern.findall(message)
 
     def evaluate(
         self,
@@ -75,18 +86,36 @@ class SubsystemActivityEvaluator(MeasurementEvaluator):
         files = artifact_files(observation)
         measurements = []
 
-        # Resolve developer canonical id for contributor tracking
-        identity = self._identity_resolver.resolve_from_observation_facts(observation.facts)
-        canonical_dev = identity.canonical_id
+        if not observation.actors:
+            return []
+            
+        primary_dev = observation.actors[0].id
+        
+        message = getattr(observation.facts, "message", "")
+        co_author_emails = self._extract_co_authors(message)
+        
+        collaborators = [primary_dev]
+        for email in co_author_emails:
+            collaborators.append(email)
+            
+        collaborators = list(dict.fromkeys(collaborators))
+        N = len(collaborators)
 
-        # Group files by canonical subsystem name (not raw directory)
-        subsystem_churn:   defaultdict[str, int]        = defaultdict(int)
+        subsystem_churn:   defaultdict[str, float]      = defaultdict(float)
         subsystem_files:   defaultdict[str, set]        = defaultdict(set)
         subsystem_file_churn: defaultdict[str, list]    = defaultdict(list)
 
+        config = MeasurementConfig()
+
         for file in files:
-            subsystem = self._subsystem_resolver.resolve(file.path)
-            changes = getattr(file, "additions", 0) + getattr(file, "deletions", 0)
+            weight = config.get_file_weight(file.path, file.status)
+            if weight == 0.0:
+                continue
+                
+            subsystem = config.resolve_subsystem(file.path)
+            raw_changes = getattr(file, "additions", 0) + getattr(file, "deletions", 0)
+            changes = raw_changes * weight
+            
             subsystem_churn[subsystem]  += changes
             subsystem_files[subsystem].add(file.path)
             subsystem_file_churn[subsystem].append(float(changes))
@@ -94,48 +123,42 @@ class SubsystemActivityEvaluator(MeasurementEvaluator):
         all_subsystems = set(subsystem_churn) | set(subsystem_files)
 
         for subsystem in all_subsystems:
-            churn      = float(subsystem_churn.get(subsystem, 0))
+            churn      = float(subsystem_churn.get(subsystem, 0.0))
             file_set   = subsystem_files.get(subsystem, set())
             file_churn = subsystem_file_churn.get(subsystem, [])
             file_count = float(len(file_set))
+            
+            fractional_churn = churn / N
+            fractional_file_count = file_count / N
+            
+            gini = _gini(file_churn) if file_churn else 0.0
+            total_files_in_commit = len(files) or 1
+            coupling = min(file_count / total_files_in_commit, 1.0)
 
-            # Legacy directory_churn (kept for backwards compat)
-            if self.DIRECTORY_CHURN:
-                measurements.append(self._m(self.DIRECTORY_CHURN, churn, observation, context, subsystem, {"coverage": 1.0}))
+            for i, actor in enumerate(collaborators):
+                role = "primary" if i == 0 else "co-author"
+                meta = {"coverage": 1.0, "developer": actor, "role": role}
 
-            # Legacy directory_file_count
-            if self.DIRECTORY_FILE_COUNT:
-                measurements.append(self._m(self.DIRECTORY_FILE_COUNT, file_count, observation, context, subsystem, {"coverage": 1.0}))
+                if self.DIRECTORY_CHURN:
+                    measurements.append(self._m(self.DIRECTORY_CHURN, fractional_churn, observation, context, subsystem, meta))
 
-            # Tier 2: subsystem_churn_rate
-            if self.SUBSYSTEM_CHURN_RATE:
-                measurements.append(self._m(self.SUBSYSTEM_CHURN_RATE, churn, observation, context, subsystem, {"coverage": 1.0}))
+                if self.DIRECTORY_FILE_COUNT:
+                    measurements.append(self._m(self.DIRECTORY_FILE_COUNT, fractional_file_count, observation, context, subsystem, meta))
 
-            # Tier 2: subsystem_contributor_count (1 per commit — aggregated upstream)
-            if self.SUBSYSTEM_CONTRIBUTOR:
-                measurements.append(self._m(
-                    self.SUBSYSTEM_CONTRIBUTOR, 1.0, observation, context, subsystem,
-                    {"coverage": 1.0, "developer": canonical_dev},
-                ))
+                if self.SUBSYSTEM_CHURN_RATE:
+                    measurements.append(self._m(self.SUBSYSTEM_CHURN_RATE, fractional_churn, observation, context, subsystem, meta))
 
-            # Tier 2: subsystem_file_concentration (Gini coefficient)
-            if self.SUBSYSTEM_CONCENTRATION and file_churn:
-                gini = _gini(file_churn)
-                measurements.append(self._m(self.SUBSYSTEM_CONCENTRATION, gini, observation, context, subsystem, {"coverage": 1.0}))
+                if self.SUBSYSTEM_CONTRIBUTOR:
+                    measurements.append(self._m(self.SUBSYSTEM_CONTRIBUTOR, 1.0, observation, context, subsystem, meta))
 
-            # Tier 2: subsystem_coupling_score
-            # Within a single commit, all files in the subsystem are coupled.
-            # Score = files_in_subsystem / total_files_in_commit (normalized 0-1)
-            if self.SUBSYSTEM_COUPLING:
-                total_files_in_commit = len(files) or 1
-                coupling = min(file_count / total_files_in_commit, 1.0)
-                measurements.append(self._m(self.SUBSYSTEM_COUPLING, coupling, observation, context, subsystem, {"coverage": 1.0}))
+                if self.SUBSYSTEM_CONCENTRATION and file_churn:
+                    measurements.append(self._m(self.SUBSYSTEM_CONCENTRATION, gini, observation, context, subsystem, meta))
 
-            # Tier 2: subsystem_volatility (std dev approximation per commit = |churn|)
-            # Proper std dev needs aggregation across commits — we emit the raw churn
-            # and let the aggregation layer compute variance.
-            if self.SUBSYSTEM_VOLATILITY:
-                measurements.append(self._m(self.SUBSYSTEM_VOLATILITY, churn, observation, context, subsystem, {"coverage": 1.0}))
+                if self.SUBSYSTEM_COUPLING:
+                    measurements.append(self._m(self.SUBSYSTEM_COUPLING, coupling, observation, context, subsystem, meta))
+
+                if self.SUBSYSTEM_VOLATILITY:
+                    measurements.append(self._m(self.SUBSYSTEM_VOLATILITY, fractional_churn, observation, context, subsystem, meta))
 
         return measurements
 
@@ -157,7 +180,7 @@ class SubsystemActivityEvaluator(MeasurementEvaluator):
             id=stable_measurement_id(
                 observation.observation_id,
                 definition.id,
-                f"{definition.version}:{target_entity}",
+                f"{definition.version}:{target_entity}:{metadata.get('developer', 'unknown')}",
             ),
             definition=definition,
             unit=definition.unit,

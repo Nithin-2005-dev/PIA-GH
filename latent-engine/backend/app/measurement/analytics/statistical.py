@@ -1,34 +1,45 @@
 from math import log2
 from statistics import mean
 from statistics import median
+from typing import Optional
 
+
+import math
 
 class StatisticalEngine:
+    MINIMUM_VARIANCE_FLOOR = 0.01 
+
+    def calculate_safe_deviation(self, windsorized_values: list[float]) -> float:
+        """Calculates standard deviation with a regularization floor."""
+        var = self.variance(windsorized_values)
+        if var is None or var < self.MINIMUM_VARIANCE_FLOOR:
+            return math.sqrt(self.MINIMUM_VARIANCE_FLOOR)
+        return math.sqrt(var)
 
     def mean(
         self,
         values: list[float],
-    ) -> float:
+    ) -> Optional[float]:
         return mean(
             values
-        ) if values else 0.0
+        ) if values else None
 
     def median(
         self,
         values: list[float],
-    ) -> float:
+    ) -> Optional[float]:
         return median(
             values
-        ) if values else 0.0
+        ) if values else None
 
     def variance(
         self,
         values: list[float],
-    ) -> float:
+    ) -> Optional[float]:
         if len(
             values
         ) < 2:
-            return 0.0
+            return None
 
         average = mean(
             values
@@ -51,14 +62,14 @@ class StatisticalEngine:
         self,
         left: list[float],
         right: list[float],
-    ) -> float:
+    ) -> Optional[float]:
         count = min(
             len(left),
             len(right),
         )
 
         if count < 2:
-            return 0.0
+            return None
 
         left_values = left[:count]
         right_values = right[:count]
@@ -85,7 +96,7 @@ class StatisticalEngine:
         self,
         left: list[float],
         right: list[float],
-    ) -> float:
+    ) -> Optional[float]:
         covariance = self.covariance(
             left,
             right,
@@ -104,8 +115,8 @@ class StatisticalEngine:
             * right_variance
         ) ** 0.5
 
-        if denominator == 0:
-            return 0.0
+        if denominator == 0 or covariance is None:
+            return None
 
         return covariance / denominator
 
@@ -113,9 +124,9 @@ class StatisticalEngine:
         self,
         values: list[float],
         percentile: float,
-    ) -> float:
+    ) -> Optional[float]:
         if not values:
-            return 0.0
+            return None
 
         ordered = sorted(
             values
@@ -137,7 +148,7 @@ class StatisticalEngine:
     def entropy(
         self,
         values: list[float],
-    ) -> float:
+    ) -> Optional[float]:
         total = sum(
             value
             for value in values
@@ -145,7 +156,7 @@ class StatisticalEngine:
         )
 
         if total <= 0:
-            return 0.0
+            return None
 
         result = 0.0
 
@@ -164,7 +175,7 @@ class StatisticalEngine:
         self,
         observed: list[float],
         expected: list[float],
-    ) -> float:
+    ) -> Optional[float]:
         total_observed = sum(
             observed
         )
@@ -176,7 +187,7 @@ class StatisticalEngine:
             total_observed <= 0
             or total_expected <= 0
         ):
-            return 0.0
+            return None
 
         result = 0.0
 

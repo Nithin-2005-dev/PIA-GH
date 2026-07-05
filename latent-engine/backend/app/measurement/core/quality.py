@@ -67,3 +67,22 @@ class DefaultQualityScorer(QualityScorer):
         )
 
 
+class RecomputeQualityGate:
+    MAX_ALLOWED_DRIFT_PERCENTAGE = 5.0  # 500%
+    
+    @classmethod
+    def check_divergence(cls, old_value: float, new_value: float) -> tuple[bool, float]:
+        """
+        Calculates drift. Returns (is_safe, percentage_drift).
+        If drift exceeds MAX_ALLOWED_DRIFT_PERCENTAGE, it requires manual human approval.
+        """
+        if old_value == 0.0:
+            if new_value == 0.0:
+                return True, 0.0
+            return False, float('inf') # Infinite drift from zero requires approval
+            
+        drift = abs(new_value - old_value) / abs(old_value)
+        is_safe = drift <= cls.MAX_ALLOWED_DRIFT_PERCENTAGE
+        return is_safe, drift
+
+

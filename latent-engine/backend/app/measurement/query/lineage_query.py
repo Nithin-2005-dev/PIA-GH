@@ -74,3 +74,16 @@ class MeasurementLineageQueryEngine:
         ]
 
 
+from dataclasses import dataclass
+from typing import List, Dict, Any
+
+@dataclass(frozen=True)
+class LineagePayload:
+    """The secure, verifiable payload returned to the Evidence/Cognitive Layers."""
+    tenant_id: str
+    measurements: List[Any]
+    # The cryptographic map proving WHY these measurements exist
+    provenance_graph: Dict[str, Any] # { measurement_id: [source_observation_ids, supersedes_id] }
+    query_execution_time_ms: float
+
+

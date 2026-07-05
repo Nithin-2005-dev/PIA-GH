@@ -1,5 +1,7 @@
+import re
 from app.measurement.core.ids import stable_measurement_id
 from app.measurement.core.interfaces import MeasurementEvaluator
+from app.measurement.core.measurement_config import MeasurementConfig
 from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementContext
 from app.measurement.domain import MeasurementDefinition
@@ -19,6 +21,14 @@ from app.observation.domain import Observation
 
 class ChangeComplexityEvaluator(MeasurementEvaluator):
 
+    @property
+    def metric_name(self) -> str:
+        return "change_complexity"
+
+    @property
+    def logic_version(self) -> str:
+        return "v1.0.0"
+
     _REGISTRY = DefaultMeasurementCatalog.build()
 
     CODE_CHURN = _REGISTRY.get("code_churn")
@@ -28,17 +38,7 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
         "change_distribution_entropy"
     )
 
-    _COMPLEXITY_TOKENS = (
-        " if ",
-        " for ",
-        " while ",
-        " case ",
-        " catch ",
-        " except ",
-        "&&",
-        "||",
-        "?",
-    )
+
 
     def evaluate(
         self,
@@ -49,33 +49,30 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
             observation
         )
 
-        churn = additions(
-            observation
-        ) + deletions(
-            observation
-        )
+        effective_churn = 0.0
+        effective_file_count = 0.0
+        effective_complexity_delta = 0.0
+        weighted_changes = []
 
-        file_count = files_changed(
-            observation
-        )
+        config = MeasurementConfig()
 
-        complexity_delta = self._patch_complexity_delta(
-            files
-        )
+        for file in files:
+            weight = config.get_file_weight(file.path, file.status)
+            if weight == 0.0:
+                continue
 
-        distribution_entropy = entropy(
-            [
-                float(
-                    file.changes
-                )
-                for file in files
-            ]
-        )
+            churn = float(file.additions + file.deletions)
+            effective_churn += churn * weight
+            effective_file_count += weight
+            effective_complexity_delta += self._calculate_mccabe_delta(file.patch) * weight
+            weighted_changes.append(float(file.changes) * weight)
+
+        distribution_entropy = entropy(weighted_changes)
 
         return [
             self._measurement(
                 self.CODE_CHURN,
-                churn,
+                effective_churn,
                 observation,
                 context,
                 {
@@ -84,16 +81,16 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
             ),
             self._measurement(
                 self.FILES_CHANGED,
-                file_count,
+                effective_file_count,
                 observation,
                 context,
                 {
-                    "coverage": 1.0 if file_count > 0 else 0.5,
+                    "coverage": 1.0 if effective_file_count > 0 else 0.5,
                 },
             ),
             self._measurement(
                 self.PATCH_COMPLEXITY_DELTA,
-                complexity_delta,
+                effective_complexity_delta,
                 observation,
                 context,
                 {
@@ -174,49 +171,35 @@ class ChangeComplexityEvaluator(MeasurementEvaluator):
             metadata=metadata,
         )
 
-    def _patch_complexity_delta(
-        self,
-        files,
-    ) -> float:
-        score = 0.0
 
-        for file in files:
-            if not file.patch:
-                continue
 
-            for line in str(
-                file.patch
-            ).splitlines():
-                if line.startswith(
-                    "+++"
-                ) or line.startswith(
-                    "---"
-                ):
+    def _calculate_mccabe_delta(self, patch: str | None) -> float:
+        if not patch:
+            return 0.0
+            
+        try:
+            # 1. Sanitize: strip string literals and single-line comments
+            sanitized = re.sub(r'".*?"|\'.*?\'', '', patch)
+            sanitized = re.sub(r'(#|//).*', '', sanitized)
+            
+            score = 0.0
+            for line in sanitized.splitlines():
+                if line.startswith('+++') or line.startswith('---'):
                     continue
-
-                sign = 0.0
-
-                if line.startswith(
-                    "+"
-                ):
-                    sign = 1.0
-                elif line.startswith(
-                    "-"
-                ):
-                    sign = -1.0
-
-                if sign == 0.0:
+                if not (line.startswith('+') or line.startswith('-')):
                     continue
-
-                normalized = f" {line[1:].lower()} "
-
-                score += sign * sum(
-                    1
-                    for token in self._COMPLEXITY_TOKENS
-                    if token in normalized
-                )
-
-        return score
+                    
+                # Scan for branching keywords
+                matches = re.findall(r'\b(if|elif|else if|for|while|case|catch)\b', line)
+                score += len(matches)
+                
+                # Scan for logical operators
+                matches = re.findall(r'(&&|\|\||\?)', line)
+                score += len(matches)
+                
+            return float(score)
+        except Exception:
+            return 0.0
 
     def _patch_coverage(
         self,

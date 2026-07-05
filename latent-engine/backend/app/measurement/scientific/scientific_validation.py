@@ -6,7 +6,7 @@ from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementDefinition
 from app.measurement.domain import ValidationResult
 from app.measurement.domain import ValidationStatus
-from app.measurement.intelligence.measurement_knowledge import SoftwareMeasurementKnowledgeBase
+from app.evidence.semantic.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
 from app.measurement.domain.registry import MeasurementRegistry
 
 
@@ -305,5 +305,48 @@ class CatalogValidationService:
             )
             for definition in self._registry.all()
         ]
+
+import random
+import copy
+import logging
+from typing import List, Dict, Any
+from datetime import timedelta
+
+logger = logging.getLogger(__name__)
+
+from app.measurement.scientific.mcmc_generator import MarkovChainCorpusGenerator
+
+class MonteCarloValidationEngine:
+    def __init__(self):
+        self.generator = MarkovChainCorpusGenerator()
+
+    def run_simulation_suite(self, engine: Any, iterations: int = 100, events_per_sim: int = 50) -> Dict[str, Any]:
+        """Runs the measurement engine against MCMC generated realities."""
+        logger.info(f"Initiating MCMC Simulation: {iterations} iterations.")
+        
+        success_counts = 0
+        total_runs = 0
+        
+        for i in range(iterations):
+            # Generate a completely novel, logically sound reality
+            synthetic_history = self.generator.generate_synthetic_history(num_events=events_per_sim)
+            
+            try:
+                # Feed the Markov-generated timeline into the physics engine
+                sim_measurements = [engine.measure_observation(obs, None) for obs in synthetic_history]
+                
+                # Check for fatal mathematical failures (e.g. engine crashes on edge cases)
+                if sim_measurements is not None:
+                     success_counts += 1
+            except Exception as e:
+                logger.error(f"Simulation failed on MCMC iteration {i}: {e}")
+                
+            total_runs += 1
+            
+        return {
+            "iterations_run": total_runs,
+            "survival_rate": success_counts / total_runs if total_runs else 0.0,
+            "mcmc_engine_active": True
+        }
 
 

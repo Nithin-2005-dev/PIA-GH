@@ -24,11 +24,11 @@ _LEGACY_MODULE_ALIASES = {
     'contracts': 'app.measurement.domain.contracts',
     'ontology': 'app.measurement.domain.ontology',
     'registry': 'app.measurement.domain.registry',
-    'signals': 'app.measurement.signal_intelligence.signals',
-    'signal_ontology': 'app.measurement.signal_intelligence.signal_ontology',
-    'signal_classifier': 'app.measurement.signal_intelligence.signal_classifier',
-    'mapping': 'app.measurement.signal_intelligence.mapping',
-    'signal_validation': 'app.measurement.signal_intelligence.signal_validation',
+    'signals': 'app.cognitive.classifiers.signals',
+    'signal_ontology': 'app.cognitive.classifiers.signal_ontology',
+    'signal_classifier': 'app.cognitive.classifiers.signal_classifier',
+    'mapping': 'app.cognitive.classifiers.mapping',
+    'signal_validation': 'app.cognitive.classifiers.signal_validation',
     'scientific_api': 'app.measurement.scientific.scientific_api',
     'scientific_catalog': 'app.measurement.scientific.scientific_catalog',
     'scientific_validation': 'app.measurement.scientific.scientific_validation',
@@ -49,10 +49,10 @@ _LEGACY_MODULE_ALIASES = {
     'lineage': 'app.measurement.query.lineage',
     'lineage_query': 'app.measurement.query.lineage_query',
     'knowledge_api': 'app.measurement.query.knowledge_api',
-    'knowledge_base': 'app.measurement.intelligence.knowledge_base',
-    'measurement_knowledge': 'app.measurement.intelligence.measurement_knowledge',
-    'domain_packs': 'app.measurement.intelligence.domain_packs',
-    'semantic_graph': 'app.measurement.intelligence.semantic_graph',
+    'knowledge_base': 'app.evidence.semantic.knowledge.knowledge_base',
+    'measurement_knowledge': 'app.evidence.semantic.knowledge.measurement_knowledge',
+    'domain_packs': 'app.evidence.semantic.knowledge.domain_packs',
+    'semantic_graph': 'app.evidence.semantic.knowledge.semantic_graph',
     'packs': 'app.measurement.plugins_runtime.packs',
     'plugins': 'app.measurement.plugins_runtime.plugins',
     'ml': 'app.measurement.plugins_runtime.ml',
@@ -74,16 +74,16 @@ from app.measurement.domain import (
 )
 from app.measurement.core.engine import MeasurementEngine
 from app.measurement.core.execution import MeasurementExecutionPlanner
-from app.measurement.signal_intelligence.mapping import SignalToMeasurementMapper
+from app.cognitive.classifiers.mapping import SignalToMeasurementMapper
 from app.measurement.domain.ontology import MeasurementOntology
 from app.measurement.domain.registry import MeasurementRegistry
 from app.measurement.scientific.scientific_api import ScientificMeasurementApi
 from app.measurement.scientific.scientific_catalog import EnterpriseMeasurementCatalog
 from app.measurement.scientific.scientific_validation import ScientificValidationEngine
-from app.measurement.intelligence.semantic_graph import SemanticMeasurementGraph
-from app.measurement.signal_intelligence.signal_classifier import SemanticSignalClassifier
-from app.measurement.signal_intelligence.signal_ontology import SignalOntology
-from app.measurement.signal_intelligence.signals import DefaultSignalCatalog, SignalRegistry
+from app.evidence.semantic.knowledge.semantic_graph import SemanticMeasurementGraph
+from app.cognitive.classifiers.signal_classifier import SemanticSignalClassifier
+from app.cognitive.classifiers.signal_ontology import SignalOntology
+from app.cognitive.classifiers.signals import DefaultSignalCatalog, SignalRegistry
 
 __all__ = [
     'DefaultMeasurementCatalog',

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.measurement.domain import MeasurementDefinition
+from app.measurement.core.interfaces import MeasurementEvaluator
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class MeasurementRegistry:
             MeasurementDefinition,
         ] = {}
         self._latest_versions: dict[str, str] = {}
+        self._evaluators: dict[str, MeasurementEvaluator] = {}
 
     def register(
         self,
@@ -101,5 +103,16 @@ class MeasurementRegistry:
         return list(
             self._definitions.values()
         )
+
+    def register_evaluator(
+        self,
+        evaluator: MeasurementEvaluator,
+    ) -> None:
+        self._evaluators[evaluator.metric_name] = evaluator
+
+    def get_active_evaluators(
+        self,
+    ) -> list[MeasurementEvaluator]:
+        return list(self._evaluators.values())
 
 

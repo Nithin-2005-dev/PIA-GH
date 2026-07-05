@@ -5,6 +5,21 @@ from app.observation.domain import Observation
 
 
 class MeasurementEvaluator(ABC):
+    
+    @property
+    @abstractmethod
+    def metric_name(self) -> str:
+        """The canonical name of the metric."""
+        raise NotImplementedError
+        
+    @property
+    @abstractmethod
+    def logic_version(self) -> str:
+        """
+        The version of the calculation logic (e.g., 'v1.0.0').
+        MUST be bumped if the underlying math or logic changes.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def evaluate(

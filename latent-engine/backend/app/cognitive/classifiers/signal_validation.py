@@ -1,9 +1,9 @@
 from app.measurement.domain import SoftwareSignal
 from app.measurement.domain import ValidationResult
 from app.measurement.domain import ValidationStatus
-from app.measurement.signal_intelligence.mapping import MappingResolution
-from app.measurement.signal_intelligence.signal_classifier import SignalClassification
-from app.measurement.signal_intelligence.signals import SignalDefinition
+from app.cognitive.classifiers.mapping import MappingResolution
+from app.cognitive.classifiers.signal_classifier import SignalClassification
+from app.cognitive.classifiers.signals import SignalDefinition
 
 
 class SignalDefinitionValidator:

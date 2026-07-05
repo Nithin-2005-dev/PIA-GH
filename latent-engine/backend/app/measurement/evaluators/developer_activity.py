@@ -21,6 +21,7 @@ Expected Accuracy:
 """
 
 import math
+import re
 from collections import Counter
 
 from app.measurement.core.ids import stable_measurement_id
@@ -35,12 +36,19 @@ from app.measurement.domain import MeasurementUncertainty
 from app.measurement.domain import NormalizationMethod
 from app.measurement.domain.catalog import DefaultMeasurementCatalog
 from app.measurement.evaluators.common import artifact_files
-from app.measurement.identity.resolver import DeveloperIdentityResolver
-from app.measurement.subsystem.boundary import SubsystemResolver
+from app.measurement.core.measurement_config import MeasurementConfig
 from app.observation.domain import Observation
 
 
 class DeveloperActivityEvaluator(MeasurementEvaluator):
+
+    @property
+    def metric_name(self) -> str:
+        return "developer_activity"
+
+    @property
+    def logic_version(self) -> str:
+        return "v1.0.0"
 
     _REGISTRY = DefaultMeasurementCatalog.build()
 
@@ -53,8 +61,12 @@ class DeveloperActivityEvaluator(MeasurementEvaluator):
     DEV_COMMIT_FREQUENCY      = _REGISTRY.get("developer_commit_frequency")
     DEV_FILES_OWNED           = _REGISTRY.get("developer_files_owned")
 
-    _identity_resolver = DeveloperIdentityResolver()
-    _subsystem_resolver = SubsystemResolver.default()
+    def _extract_co_authors(self, message: str) -> list[str]:
+        """Extracts emails from 'Co-authored-by: Name <email>' trailers."""
+        if not message:
+            return []
+        pattern = re.compile(r'(?mi)^Co-authored-by:\s*.*?\s*<(.*?)>')
+        return pattern.findall(message)
 
     def evaluate(
         self,
@@ -64,56 +76,85 @@ class DeveloperActivityEvaluator(MeasurementEvaluator):
         if not hasattr(observation.facts, "author_name") or not observation.facts.author_name:
             return []
 
-        # Resolve canonical developer identity
-        identity = self._identity_resolver.resolve_from_observation_facts(observation.facts)
-        canonical_id = identity.canonical_id
+        if not observation.actors:
+            return []
+            
+        primary_id = observation.actors[0].id
+
+        # Mitigate Trap 2: Invisible Collaborators
+        message = getattr(observation.facts, "message", "")
+        co_author_emails = self._extract_co_authors(message)
+        
+        collaborators = [primary_id]
+        for email in co_author_emails:
+            collaborators.append(email)
+        
+        # De-duplicate while preserving order
+        collaborators = list(dict.fromkeys(collaborators))
+        N = len(collaborators)
+
+        # Mitigate Trap 1 & 3: Merge Commit & Upstream Sync Distortion
+        is_merge_commit = len(getattr(observation.facts, "parent_ids", [])) > 1
 
         files = artifact_files(observation)
-        total_churn = sum(
-            getattr(f, "additions", 0) + getattr(f, "deletions", 0)
-            for f in files
-        )
-        file_touches = len(files)
-
-        # Subsystem spread — map each file to its subsystem
+        
+        effective_churn = 0.0
+        effective_file_touches = 0.0
         subsystem_counts: Counter = Counter()
-        for file in files:
-            subsystem = self._subsystem_resolver.resolve(file.path)
-            subsystem_counts[subsystem] += 1
+
+        if not is_merge_commit:
+            config = MeasurementConfig()
+            for file in files:
+                weight = config.get_file_weight(file.path, file.status)
+                if weight == 0.0:
+                    continue
+                    
+                churn = getattr(file, "additions", 0) + getattr(file, "deletions", 0)
+                effective_churn += churn * weight
+                effective_file_touches += weight
+                
+                subsystem = config.resolve_subsystem(file.path)
+                subsystem_counts[subsystem] += weight
 
         distinct_subsystems = len(subsystem_counts)
-        total_touches = sum(subsystem_counts.values()) or 1
-        max_subsystem_touches = max(subsystem_counts.values(), default=0)
+        total_touches = sum(subsystem_counts.values()) or 1.0
+        max_subsystem_touches = max(subsystem_counts.values(), default=0.0)
         subsystem_focus = max_subsystem_touches / total_touches
 
-        # Recency score — 1.0 if committed within 7 days, decays with half-life=14d
-        recency_score = 1.0  # within the same observation window, recency is maximum
+        recency_score = 1.0
 
         measurements = []
 
-        if self.AUTHOR_CONTRIBUTION_COUNT:
-            measurements.append(self._m(self.AUTHOR_CONTRIBUTION_COUNT, 1.0, observation, context, canonical_id, {"coverage": 1.0}))
+        for i, actor_id in enumerate(collaborators):
+            role = "primary" if i == 0 else "co-author"
+            meta = {"coverage": 1.0, "role": role}
+            
+            actor_churn = effective_churn / N
+            actor_file_touches = effective_file_touches / N
 
-        if self.AUTHOR_FILE_TOUCH_COUNT:
-            measurements.append(self._m(self.AUTHOR_FILE_TOUCH_COUNT, float(file_touches), observation, context, canonical_id, {"coverage": 1.0 if file_touches > 0 else 0.0}))
+            if self.AUTHOR_CONTRIBUTION_COUNT:
+                measurements.append(self._m(self.AUTHOR_CONTRIBUTION_COUNT, 1.0, observation, context, actor_id, meta))
 
-        if self.AUTHOR_CODE_CHURN:
-            measurements.append(self._m(self.AUTHOR_CODE_CHURN, float(total_churn), observation, context, canonical_id, {"coverage": 1.0}))
+            if self.AUTHOR_FILE_TOUCH_COUNT:
+                measurements.append(self._m(self.AUTHOR_FILE_TOUCH_COUNT, actor_file_touches, observation, context, actor_id, {**meta, "coverage": 1.0 if actor_file_touches > 0 else 0.0}))
 
-        if self.DEV_KNOWLEDGE_SPREAD:
-            measurements.append(self._m(self.DEV_KNOWLEDGE_SPREAD, float(distinct_subsystems), observation, context, canonical_id, {"coverage": 1.0}))
+            if self.AUTHOR_CODE_CHURN:
+                measurements.append(self._m(self.AUTHOR_CODE_CHURN, actor_churn, observation, context, actor_id, meta))
 
-        if self.DEV_SUBSYSTEM_FOCUS:
-            measurements.append(self._m(self.DEV_SUBSYSTEM_FOCUS, subsystem_focus, observation, context, canonical_id, {"coverage": 1.0}))
+            if self.DEV_KNOWLEDGE_SPREAD:
+                measurements.append(self._m(self.DEV_KNOWLEDGE_SPREAD, float(distinct_subsystems), observation, context, actor_id, meta))
 
-        if self.DEV_RECENCY_SCORE:
-            measurements.append(self._m(self.DEV_RECENCY_SCORE, recency_score, observation, context, canonical_id, {"coverage": 1.0}))
+            if self.DEV_SUBSYSTEM_FOCUS:
+                measurements.append(self._m(self.DEV_SUBSYSTEM_FOCUS, subsystem_focus, observation, context, actor_id, meta))
 
-        if self.DEV_COMMIT_FREQUENCY:
-            measurements.append(self._m(self.DEV_COMMIT_FREQUENCY, 1.0, observation, context, canonical_id, {"coverage": 1.0}))
+            if self.DEV_RECENCY_SCORE:
+                measurements.append(self._m(self.DEV_RECENCY_SCORE, recency_score, observation, context, actor_id, meta))
 
-        if self.DEV_FILES_OWNED:
-            measurements.append(self._m(self.DEV_FILES_OWNED, float(file_touches), observation, context, canonical_id, {"coverage": 1.0}))
+            if self.DEV_COMMIT_FREQUENCY:
+                measurements.append(self._m(self.DEV_COMMIT_FREQUENCY, 1.0, observation, context, actor_id, meta))
+
+            if self.DEV_FILES_OWNED:
+                measurements.append(self._m(self.DEV_FILES_OWNED, actor_file_touches, observation, context, actor_id, meta))
 
         return measurements
 

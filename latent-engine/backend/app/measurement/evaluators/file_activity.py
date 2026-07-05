@@ -11,10 +11,19 @@ from app.measurement.domain import MeasurementUncertainty
 from app.measurement.domain import NormalizationMethod
 from app.measurement.domain.catalog import DefaultMeasurementCatalog
 from app.measurement.evaluators.common import artifact_files
+from app.measurement.core.measurement_config import MeasurementConfig
 from app.observation.domain import Observation
 
 
 class FileActivityEvaluator(MeasurementEvaluator):
+
+    @property
+    def metric_name(self) -> str:
+        return "file_activity"
+
+    @property
+    def logic_version(self) -> str:
+        return "v1.0.0"
 
     _REGISTRY = DefaultMeasurementCatalog.build()
 
@@ -24,6 +33,12 @@ class FileActivityEvaluator(MeasurementEvaluator):
     FILE_IS_TEST = _REGISTRY.get("file_is_test")
     FILE_IS_DOCUMENTATION = _REGISTRY.get("file_is_documentation")
 
+    def _extract_co_authors(self, message: str) -> list[str]:
+        if not message:
+            return []
+        pattern = re.compile(r'(?mi)^Co-authored-by:\s*.*?\s*<(.*?)>')
+        return pattern.findall(message)
+
     def evaluate(
         self,
         observation: Observation,
@@ -32,78 +47,64 @@ class FileActivityEvaluator(MeasurementEvaluator):
         files = artifact_files(observation)
         measurements = []
 
+        if not observation.actors:
+            return []
+            
+        primary_dev = observation.actors[0].id
+        message = getattr(observation.facts, "message", "")
+        co_author_emails = self._extract_co_authors(message)
+        
+        collaborators = [primary_dev]
+        for email in co_author_emails:
+            collaborators.append(email)
+            
+        collaborators = list(dict.fromkeys(collaborators))
+        N = len(collaborators)
+
+        config = MeasurementConfig()
+
         for file in files:
             path = file.path
+            status = getattr(file, "status", "modified")
             additions = getattr(file, "additions", 0)
             deletions = getattr(file, "deletions", 0)
-            changes = additions + deletions
+            raw_changes = additions + deletions
             
-            # File churn
-            if self.FILE_CHURN:
-                measurements.append(
-                    self._measurement(
-                        self.FILE_CHURN,
-                        float(changes),
-                        observation,
-                        context,
-                        path,
-                        {"coverage": 1.0},
-                    )
-                )
+            weight = config.get_file_weight(path, status)
+            if weight == 0.0:
+                continue
+                
+            effective_churn = raw_changes * weight
+            if effective_churn < config.MIN_CHURN_THRESHOLD:
+                continue
+                
+            fractional_churn = effective_churn / N
 
-            # Touch count (1 per commit)
-            if self.FILE_TOUCH_COUNT:
-                measurements.append(
-                    self._measurement(
-                        self.FILE_TOUCH_COUNT,
-                        1.0,
-                        observation,
-                        context,
-                        path,
-                        {"coverage": 1.0},
-                    )
-                )
+            for i, actor in enumerate(collaborators):
+                role = "primary" if i == 0 else "co-author"
+                meta = {"coverage": 1.0, "developer": actor, "role": role}
 
-            # Addition ratio
-            if self.FILE_ADDITION_RATIO and changes > 0:
-                measurements.append(
-                    self._measurement(
-                        self.FILE_ADDITION_RATIO,
-                        float(additions) / float(changes),
-                        observation,
-                        context,
-                        path,
-                        {"coverage": 1.0},
-                    )
-                )
+                # File churn
+                if self.FILE_CHURN:
+                    measurements.append(self._measurement(self.FILE_CHURN, fractional_churn, observation, context, path, meta))
 
-            # Is test
-            if self.FILE_IS_TEST:
-                is_test = 1.0 if re.search(r'test|spec|mock|fixture', path, re.IGNORECASE) else 0.0
-                measurements.append(
-                    self._measurement(
-                        self.FILE_IS_TEST,
-                        is_test,
-                        observation,
-                        context,
-                        path,
-                        {"coverage": 1.0},
-                    )
-                )
+                # Touch count
+                if self.FILE_TOUCH_COUNT:
+                    measurements.append(self._measurement(self.FILE_TOUCH_COUNT, 1.0, observation, context, path, meta))
 
-            # Is documentation
-            if self.FILE_IS_DOCUMENTATION:
-                is_doc = 1.0 if re.search(r'\.md|\.rst|\.txt|docs/|wiki/', path, re.IGNORECASE) else 0.0
-                measurements.append(
-                    self._measurement(
-                        self.FILE_IS_DOCUMENTATION,
-                        is_doc,
-                        observation,
-                        context,
-                        path,
-                        {"coverage": 1.0},
-                    )
-                )
+                # Addition ratio
+                if self.FILE_ADDITION_RATIO and raw_changes > 0:
+                    measurements.append(self._measurement(self.FILE_ADDITION_RATIO, float(additions) / float(raw_changes), observation, context, path, meta))
+
+                # Is test
+                if self.FILE_IS_TEST:
+                    is_test = 1.0 if re.search(r'test|spec|mock|fixture', path, re.IGNORECASE) else 0.0
+                    measurements.append(self._measurement(self.FILE_IS_TEST, is_test, observation, context, path, meta))
+
+                # Is documentation
+                if self.FILE_IS_DOCUMENTATION:
+                    is_doc = 1.0 if re.search(r'\.md|\.rst|\.txt|docs/|wiki/', path, re.IGNORECASE) else 0.0
+                    measurements.append(self._measurement(self.FILE_IS_DOCUMENTATION, is_doc, observation, context, path, meta))
 
         return measurements
 
@@ -126,7 +127,7 @@ class FileActivityEvaluator(MeasurementEvaluator):
             id=stable_measurement_id(
                 observation.observation_id,
                 definition.id,
-                f"{definition.version}:{target_entity}",
+                f"{definition.version}:{target_entity}:{metadata.get('developer', 'unknown')}",
             ),
             definition=definition,
             unit=definition.unit,

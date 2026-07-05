@@ -1,5 +1,5 @@
 """__init__.py for subsystem package."""
-from app.measurement.subsystem.boundary import (
+from app.observation.ingestion.topology.boundary import (
     SubsystemBoundaryProvider,
     SubsystemResolver,
     GitHubMonorepoProvider,

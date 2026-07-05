@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 
 
+from typing import Optional
+
 @dataclass(frozen=True)
 class BenchmarkResult:
     value: float
     percentile: float
-    label: str
     cohort: str
+    z_score: Optional[float] = None
 
 
 class BenchmarkEngine:
@@ -16,13 +18,14 @@ class BenchmarkEngine:
         value: float,
         cohort_values: list[float],
         cohort: str,
+        z_score: Optional[float] = None,
     ) -> BenchmarkResult:
         if not cohort_values:
             return BenchmarkResult(
                 value=value,
                 percentile=0.0,
-                label="unknown",
                 cohort=cohort,
+                z_score=z_score
             )
 
         below_or_equal = sum(
@@ -35,18 +38,11 @@ class BenchmarkEngine:
             cohort_values
         )
 
-        label = "typical"
-
-        if percentile >= 0.9:
-            label = "high"
-        elif percentile <= 0.1:
-            label = "low"
-
         return BenchmarkResult(
             value=value,
             percentile=percentile,
-            label=label,
             cohort=cohort,
+            z_score=z_score
         )
 
 

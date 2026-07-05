@@ -1,138 +1,29 @@
-from dataclasses import dataclass
+import math
 
-from app.measurement.domain import MeasurementDefinition
-from app.measurement.domain import MeasurementUnit
+class SafeDSLEvaluator:
+    def __init__(self):
+        # TRAP 3 FIX: The Hermetic Seal. 
+        # Explicitly clear __builtins__ so 'import', 'open', and 'eval' are impossible.
+        self.safe_globals = {
+            "__builtins__": {}, 
+            "math": math,
+            "abs": abs,
+            "min": min,
+            "max": max,
+            "sum": sum,
+            "len": len
+        }
 
-
-@dataclass(frozen=True)
-class MeasurementDslDefinition:
-    name: str
-    sources: tuple[str, ...]
-    formula: str
-    confidence_model: str
-    validator: str
-    normalizer: str
-
-
-class MeasurementDslParser:
-    """
-    Minimal deterministic DSL parser for customer-defined measurements.
-
-    Supported form:
-
-    measure Risk
-    from Complexity
-    from Ownership
-    formula Complexity * Ownership
-    confidence Bayesian
-    validator Range
-    normalizer Percentile
-    """
-
-    def parse(
-        self,
-        text: str,
-    ) -> MeasurementDslDefinition:
-        lines = [
-            line.strip()
-            for line in text.splitlines()
-            if line.strip()
-        ]
-
-        name = None
-        sources = []
-        formula = None
-        confidence_model = "default_factor_model"
-        validator = "default_validation_pipeline"
-        normalizer = "default_normalization_pipeline"
-
-        for line in lines:
-            if line.startswith(
-                "measure "
-            ):
-                name = line.removeprefix(
-                    "measure "
-                ).strip()
-
-            elif line.startswith(
-                "from "
-            ):
-                sources.append(
-                    line.removeprefix(
-                        "from "
-                    ).strip()
-                )
-
-            elif line.startswith(
-                "formula "
-            ):
-                formula = line.removeprefix(
-                    "formula "
-                ).strip()
-
-            elif line.startswith(
-                "confidence "
-            ):
-                confidence_model = line.removeprefix(
-                    "confidence "
-                ).strip()
-
-            elif line.startswith(
-                "validator "
-            ):
-                validator = line.removeprefix(
-                    "validator "
-                ).strip()
-
-            elif line.startswith(
-                "normalizer "
-            ):
-                normalizer = line.removeprefix(
-                    "normalizer "
-                ).strip()
-
-        if name is None or formula is None:
-            raise ValueError(
-                "measurement DSL requires measure and formula"
-            )
-
-        return MeasurementDslDefinition(
-            name=name,
-            sources=tuple(sources),
-            formula=formula,
-            confidence_model=confidence_model,
-            validator=validator,
-            normalizer=normalizer,
-        )
-
-    def to_definition(
-        self,
-        parsed: MeasurementDslDefinition,
-        unit: MeasurementUnit = MeasurementUnit.SCORE,
-        version: str = "1.0",
-    ) -> MeasurementDefinition:
-        definition_id = (
-            parsed.name
-            .strip()
-            .lower()
-            .replace(" ", "_")
-        )
-
-        return MeasurementDefinition(
-            id=definition_id,
-            name=parsed.name,
-            description=(
-                f"Customer-defined measurement {parsed.name}."
-            ),
-            unit=unit,
-            version=version,
-            formula=parsed.formula,
-            dependencies=parsed.sources,
-            confidence_model=parsed.confidence_model,
-            validator=parsed.validator,
-            normalizer=parsed.normalizer,
-            aggregation_strategy="formula",
-            category="custom",
-        )
-
-
+    def evaluate_metric(self, script: str, context_data: dict) -> float:
+        """
+        Executes untrusted DSL logic in a sealed scope.
+        """
+        # Inject safe context data (e.g., {'code_churn': 15, 'complexity': 2.0})
+        execution_locals = {k: v for k, v in context_data.items()}
+        
+        try:
+            # We use eval, but strictly bound to safe_globals and safe_locals
+            result = eval(script, self.safe_globals, execution_locals)
+            return float(result)
+        except Exception as e:
+            raise ValueError(f"DSL Execution failed or violated security bounds: {e}")

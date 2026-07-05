@@ -6,8 +6,8 @@ from app.measurement.domain import ExpectedRange
 from app.measurement.domain import MeasurementDefinition
 from app.measurement.domain import MeasurementReference
 from app.measurement.domain import MeasurementUnit
-from app.measurement.intelligence.measurement_knowledge import MeasurementDefinitionKnowledge
-from app.measurement.intelligence.measurement_knowledge import SoftwareMeasurementKnowledgeBase
+from app.evidence.semantic.knowledge.measurement_knowledge import MeasurementDefinitionKnowledge
+from app.evidence.semantic.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
 from app.measurement.domain.registry import MeasurementRegistry
 
 

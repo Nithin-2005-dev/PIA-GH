@@ -4,7 +4,7 @@ from enum import Enum
 from app.measurement.domain import MeasurementDefinition
 from app.measurement.domain import SoftwareSignal
 from app.measurement.domain.registry import MeasurementRegistry
-from app.measurement.signal_intelligence.signal_classifier import SignalClassification
+from app.cognitive.classifiers.signal_classifier import SignalClassification
 
 
 class MappingCardinality(Enum):

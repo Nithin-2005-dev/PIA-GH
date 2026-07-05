@@ -5,12 +5,7 @@ from app.measurement.core.confidence import DefaultConfidenceEstimator
 from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementContext
 from app.measurement.domain import ValidationStatus
-from app.measurement.evaluators.complexity import ChangeComplexityEvaluator
-from app.measurement.evaluators.impact import ChangeImpactEvaluator
-from app.measurement.evaluators.developer_activity import DeveloperActivityEvaluator
-from app.measurement.evaluators.file_activity import FileActivityEvaluator
-from app.measurement.evaluators.file_ownership import FileOwnershipEvaluator
-from app.measurement.evaluators.subsystem_activity import SubsystemActivityEvaluator
+from app.measurement.domain.registry import MeasurementRegistry
 from app.measurement.core.interfaces import ConfidenceEstimator
 from app.measurement.core.interfaces import MeasurementEvaluator
 from app.measurement.core.interfaces import MeasurementNormalizer
@@ -28,6 +23,8 @@ from app.measurement.core.validation import merge_validation_results
 from app.observation.domain import Observation
 from app.observation.integration.event_compat import event_to_observation
 
+import logging
+logger = logging.getLogger(__name__)
 
 class MeasurementEngine:
     """
@@ -39,14 +36,16 @@ class MeasurementEngine:
 
     def __init__(
         self,
-        evaluators: list[MeasurementEvaluator],
+        registry: MeasurementRegistry,
         normalizers: list[MeasurementNormalizer],
         validators: list[MeasurementValidator],
         confidence_estimator: ConfidenceEstimator,
         quality_scorer: QualityScorer,
         normalization_pipeline: NormalizationPipeline | None = None,
     ):
-        self._evaluators = evaluators
+        from app.measurement.core.fusion import MultiSourceFusionEngine
+
+        self._registry = registry
         self._normalizers = normalizers
         self._validators = validators
         self._confidence_estimator = confidence_estimator
@@ -55,20 +54,29 @@ class MeasurementEngine:
             normalization_pipeline
             or NormalizationPipeline.default()
         )
+        self._fusion_engine = MultiSourceFusionEngine()
 
     @classmethod
     def default(
         cls,
     ):
+        from app.measurement.evaluators.complexity import ChangeComplexityEvaluator
+        from app.measurement.evaluators.impact import ChangeImpactEvaluator
+        from app.measurement.evaluators.developer_activity import DeveloperActivityEvaluator
+        from app.measurement.evaluators.file_activity import FileActivityEvaluator
+        from app.measurement.evaluators.file_ownership import FileOwnershipEvaluator
+        from app.measurement.evaluators.subsystem_activity import SubsystemActivityEvaluator
+        
+        registry = MeasurementRegistry()
+        registry.register_evaluator(ChangeComplexityEvaluator())
+        registry.register_evaluator(ChangeImpactEvaluator())
+        registry.register_evaluator(DeveloperActivityEvaluator())
+        registry.register_evaluator(FileActivityEvaluator())
+        registry.register_evaluator(SubsystemActivityEvaluator())
+        registry.register_evaluator(FileOwnershipEvaluator())
+        
         return cls(
-            evaluators=[
-                ChangeComplexityEvaluator(),
-                ChangeImpactEvaluator(),
-                DeveloperActivityEvaluator(),
-                FileActivityEvaluator(),
-                SubsystemActivityEvaluator(),
-                FileOwnershipEvaluator(),
-            ],
+            registry=registry,
             normalizers=[
                 UnitConversionNormalizer(),
                 BoundedScoreNormalizer(),
@@ -96,21 +104,53 @@ class MeasurementEngine:
                 )
             )
 
-        measurements = []
+        finalized_measurements = []
 
-        for evaluator in self._evaluators:
-            for measurement in evaluator.evaluate(
-                observation,
-                context,
-            ):
-                measurements.append(
-                    self._finalize(
-                        measurement,
-                        context,
+        active_evaluators = self._registry.get_active_evaluators()
+        if not active_evaluators:
+            logger.warning("MeasurementEngine processed observation but no evaluators are registered.")
+            return []
+
+        for evaluator in active_evaluators:
+            try:
+                for measurement in evaluator.evaluate(
+                    observation,
+                    context,
+                ):
+                    # Inject logic version into measurement here
+                    measurement = replace(measurement, version=evaluator.logic_version)
+                    
+                    finalized_measurements.append(
+                        self._finalize(
+                            measurement,
+                            context,
+                        )
                     )
-                )
+            except Exception as e:
+                # Isolate failures so one broken evaluator doesn't crash the whole pipeline
+                logger.error(f"Evaluator {evaluator.metric_name} failed: {str(e)}")
 
-        return measurements
+        if not finalized_measurements:
+            return []
+
+        # Structural Grouping (NOT Temporal)
+        # Group by the unique collision key: What metric is being applied to whom?
+        from collections import defaultdict
+        grouped_measurements = defaultdict(list)
+        for m in finalized_measurements:
+            collision_key = f"{m.definition.id}_{m.provenance.target_entity}"
+            grouped_measurements[collision_key].append(m)
+            
+        # Resolve Conflicts using the Fusion Engine
+        fused_measurements = []
+        for collision_key, measurement_group in grouped_measurements.items():
+            if len(measurement_group) == 1:
+                fused_measurements.append(measurement_group[0])
+            else:
+                fused_result = self._fusion_engine.fuse(measurement_group)
+                fused_measurements.append(fused_result)
+
+        return fused_measurements
 
     def measure_observations(
         self,

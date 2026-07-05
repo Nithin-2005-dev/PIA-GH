@@ -1,57 +1,41 @@
-from app.measurement.core.interfaces import MeasurementEvaluator
-from app.measurement.core.interfaces import MeasurementNormalizer
-from app.measurement.core.interfaces import MeasurementValidator
+import multiprocessing
+import logging
 
+logger = logging.getLogger(__name__)
 
-class MeasurementPluginRegistry:
+def _isolated_worker(script: str, context_data: dict, return_dict: dict):
+    """Function that runs inside the isolated hardware process."""
+    try:
+        from app.measurement.plugins_runtime.dsl import SafeDSLEvaluator
+        evaluator = SafeDSLEvaluator()
+        return_dict['result'] = evaluator.evaluate_metric(script, context_data)
+    except Exception as e:
+        return_dict['error'] = str(e)
 
-    def __init__(
-        self,
-    ):
-        self._evaluators = {}
-        self._normalizers = {}
-        self._validators = {}
+class PluginEngine:
+    EXECUTION_TIMEOUT_SECONDS = 2.0  # TRAP 2 FIX: Strict Halting Limit
 
-    def register_evaluator(
-        self,
-        name: str,
-        evaluator: MeasurementEvaluator,
-    ):
-        self._evaluators[name] = evaluator
-
-    def register_normalizer(
-        self,
-        name: str,
-        normalizer: MeasurementNormalizer,
-    ):
-        self._normalizers[name] = normalizer
-
-    def register_validator(
-        self,
-        name: str,
-        validator: MeasurementValidator,
-    ):
-        self._validators[name] = validator
-
-    def evaluators(
-        self,
-    ) -> list[MeasurementEvaluator]:
-        return list(
-            self._evaluators.values()
-        )
-
-    def normalizers(
-        self,
-    ) -> list[MeasurementNormalizer]:
-        return list(
-            self._normalizers.values()
-        )
-
-    def validators(
-        self,
-    ) -> list[MeasurementValidator]:
-        return list(
-            self._validators.values()
-        )
-
-
+    def execute_untrusted_plugin(self, script: str, context_data: dict) -> float:
+        """
+        Spawns a highly restricted sub-process to execute custom logic.
+        """
+        manager = multiprocessing.Manager()
+        return_dict = manager.dict()
+        
+        # Spawn isolated process
+        p = multiprocessing.Process(target=_isolated_worker, args=(script, context_data, return_dict))
+        p.start()
+        
+        # Enforce strict timeout
+        p.join(self.EXECUTION_TIMEOUT_SECONDS)
+        
+        if p.is_alive():
+            logger.error("Plugin violated execution timeout. Terminating hardware process.")
+            p.terminate()
+            p.join()
+            raise TimeoutError("Plugin execution exceeded maximum allowed time.")
+            
+        if 'error' in return_dict:
+            raise RuntimeError(return_dict['error'])
+            
+        return return_dict.get('result', 0.0)

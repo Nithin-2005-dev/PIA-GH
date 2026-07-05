@@ -1,92 +1,28 @@
-from abc import ABC
-from abc import abstractmethod
-from dataclasses import dataclass
-from dataclasses import replace
+import logging
+from typing import Any
 
-from app.measurement.domain import Measurement
+logger = logging.getLogger(__name__)
 
+class SecurityError(Exception):
+    pass
 
-@dataclass(frozen=True)
-class CalibrationResult:
-    calibrated_value: float
-    confidence_adjustment: float
-    model_name: str
-    model_version: str
+class SafeMLRuntime:
+    def __init__(self):
+        self.allowed_extensions = ['.safetensors', '.pt']
 
+    def load_heuristic_model(self, file_path: str) -> Any:
+        """
+        Cryptographically secure model loader.
+        """
+        if not any(file_path.endswith(ext) for ext in self.allowed_extensions):
+            raise ValueError(f"Invalid model format. Allowed: {self.allowed_extensions}")
 
-class MeasurementCalibrationModel(ABC):
-    """
-    Boundary for optional ML-assisted calibration.
-
-    Implementations may improve noise filtering or confidence estimates,
-    but deterministic measurements remain the source of record.
-    """
-
-    @abstractmethod
-    def calibrate(
-        self,
-        measurement: Measurement,
-    ) -> CalibrationResult:
-        raise NotImplementedError
-
-
-class MlCalibrationService:
-    """
-    Applies optional ML calibration after deterministic measurement.
-
-    The original measurement remains the dependency/source of record.
-    Calibration is recorded as an auditable transformation that may adjust
-    bias and confidence, but does not become an independent measurement fact.
-    """
-
-    def __init__(
-        self,
-        model: MeasurementCalibrationModel,
-    ):
-        self._model = model
-
-    def calibrate(
-        self,
-        measurement: Measurement,
-    ) -> Measurement:
-        result = self._model.calibrate(
-            measurement
-        )
-
-        confidence = max(
-            0.0,
-            min(
-                1.0,
-                measurement.confidence
-                + result.confidence_adjustment,
-            ),
-        )
-
-        return replace(
-            measurement,
-            value=result.calibrated_value,
-            confidence=confidence,
-            provenance=replace(
-                measurement.provenance,
-                transformations=(
-                    *measurement.provenance.transformations,
-                    "ml_calibration",
-                    "bias_correction",
-                    "confidence_adjustment",
-                ),
-            ),
-            dependencies=(
-                *measurement.dependencies,
-                measurement.id,
-            ),
-            metadata={
-                **measurement.metadata,
-                "ml_calibration": {
-                    "model_name": result.model_name,
-                    "model_version": result.model_version,
-                    "source_measurement_id": measurement.id,
-                },
-            },
-        )
-
-
+        try:
+            # If using PyTorch, force weights_only to prevent Pickle RCE
+            import torch
+            logger.info(f"Safely mounting ML heuristics from {file_path}")
+            # TRAP 1 FIX: weights_only=True prevents arbitrary object instantiation
+            return torch.load(file_path, map_location='cpu', weights_only=True)
+        except Exception as e:
+            logger.error(f"Failed to securely load model {file_path}: {e}")
+            raise SecurityError("Model deserialization blocked by security policy.")

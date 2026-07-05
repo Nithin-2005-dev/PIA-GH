@@ -1,3 +1,5 @@
+import math
+from collections import defaultdict
 from math import log1p
 
 from app.measurement.core.ids import stable_measurement_id
@@ -16,10 +18,19 @@ from app.measurement.evaluators.common import artifact_files
 from app.measurement.evaluators.common import deletions
 from app.measurement.evaluators.common import files_changed
 from app.measurement.evaluators.common import total_changes
+from app.measurement.core.measurement_config import MeasurementConfig
 from app.observation.domain import Observation
 
 
 class ChangeImpactEvaluator(MeasurementEvaluator):
+
+    @property
+    def metric_name(self) -> str:
+        return "change_impact"
+
+    @property
+    def logic_version(self) -> str:
+        return "v1.0.0"
 
     _REGISTRY = DefaultMeasurementCatalog.build()
 
@@ -39,24 +50,21 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
             observation
         )
 
-        file_count = files_changed(
-            observation
-        )
-
-        surface_area = min(
-            100.0,
-            log1p(
-                max(
-                    churn,
-                    0.0,
-                )
-            )
-            * max(
-                1.0,
-                file_count,
-            )
-            * 4.0,
-        )
+        filtered_paths = []
+        config = MeasurementConfig()
+        for file in files:
+            weight = config.get_file_weight(file.path, file.status, context="impact")
+            if weight > 0.0:
+                filtered_paths.append(file.path)
+                
+        entropy = self._calculate_directory_entropy(filtered_paths)
+        
+        total_blast_radius = 0.0
+        for path in filtered_paths:
+            depth_multiplier = config.get_depth_multiplier(path)
+            total_blast_radius += (1.0 * depth_multiplier)
+            
+        surface_area = total_blast_radius * (1.0 + entropy)
 
         deletion_ratio = 0.0
 
@@ -188,3 +196,30 @@ class ChangeImpactEvaluator(MeasurementEvaluator):
         return files_with_patch / len(
             files
         )
+
+
+
+    def _calculate_directory_entropy(self, file_paths: list[str]) -> float:
+        """Calculates Shannon Entropy across root directories to measure coupling risk."""
+        if not file_paths:
+            return 0.0
+            
+        # Count how many files were touched in each top-level directory
+        # e.g., 'backend/app/main.py' -> root is 'backend/app'
+        dir_counts = defaultdict(int)
+        for path in file_paths:
+            parts = path.split('/')
+            # Group by the first two levels to represent a 'subsystem' (adjust as needed)
+            subsystem = "/".join(parts[:2]) if len(parts) > 1 else parts[0]
+            dir_counts[subsystem] += 1
+            
+        total_files = len(file_paths)
+        entropy = 0.0
+        
+        for count in dir_counts.values():
+            probability = count / total_files
+            entropy -= probability * math.log2(probability)
+            
+        return entropy # 0.0 means all files in one folder. Higher means highly scattered.
+
+

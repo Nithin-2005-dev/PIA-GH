@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from enum import Enum
 
 from app.measurement.domain import SoftwareSignal
-from app.measurement.signal_intelligence.signal_ontology import SignalOntology
-from app.measurement.signal_intelligence.signals import SignalDefinition
-from app.measurement.signal_intelligence.signals import SignalRegistry
+from app.cognitive.classifiers.signal_ontology import SignalOntology
+from app.cognitive.classifiers.signals import SignalDefinition
+from app.cognitive.classifiers.signals import SignalRegistry
 
 
 class ClassificationSource(Enum):

@@ -20,6 +20,7 @@ Expected Accuracy:
     High (90%+), though may misclassify trivial refactors as ownership.
 """
 
+import re
 from app.measurement.core.ids import stable_measurement_id
 from app.measurement.core.interfaces import MeasurementEvaluator
 from app.measurement.domain import Measurement
@@ -32,26 +33,40 @@ from app.measurement.domain import MeasurementUncertainty
 from app.measurement.domain import NormalizationMethod
 from app.measurement.domain.catalog import DefaultMeasurementCatalog
 from app.measurement.evaluators.common import artifact_files
-from app.measurement.identity.resolver import DeveloperIdentityResolver
+from app.measurement.core.measurement_config import MeasurementConfig
 from app.observation.domain import Observation
 
 
 class FileOwnershipEvaluator(MeasurementEvaluator):
+
+    @property
+    def metric_name(self) -> str:
+        return "file_ownership"
+
+    @property
+    def logic_version(self) -> str:
+        return "v1.0.0"
     """
-    Emits `file_ownership_score` = 1.0 for each (file, author) pair
+    Emits `file_ownership_score` based on effective absolute churn for each (file, author) pair
     in the commit. The evidence synthesis engine uses this to compute
     the ownership concentration across commits.
 
     Mathematical basis:
-        For each file, ownership_score = touches_by_majority_author / total_touches
-        Since we emit per-commit, the aggregation strategy "mean" over multiple
-        commits yields the true majority-author fraction.
+        For each file, ownership_score = sum(effective_churn_by_author) / total_effective_churn
+        By emitting absolute churn fractionally distributed to collaborators, we appropriately
+        reward cleanup/refactoring while mitigating the Janitor and Silo fallacies.
     """
 
     _REGISTRY = DefaultMeasurementCatalog.build()
     FILE_OWNERSHIP_SCORE = _REGISTRY.get("file_ownership_score")
 
-    _identity_resolver = DeveloperIdentityResolver()
+
+
+    def _extract_co_authors(self, message: str) -> list[str]:
+        if not message:
+            return []
+        pattern = re.compile(r'(?mi)^Co-authored-by:\s*.*?\s*<(.*?)>')
+        return pattern.findall(message)
 
     def evaluate(
         self,
@@ -65,22 +80,49 @@ class FileOwnershipEvaluator(MeasurementEvaluator):
         if not files:
             return []
 
-        identity = self._identity_resolver.resolve_from_observation_facts(observation.facts)
-        canonical_dev = identity.canonical_id
+        if not observation.actors:
+            return []
+            
+        primary_dev = observation.actors[0].id
+        
+        message = getattr(observation.facts, "message", "")
+        co_author_emails = self._extract_co_authors(message)
+        
+        collaborators = [primary_dev]
+        for email in co_author_emails:
+            collaborators.append(email)
+            
+        collaborators = list(dict.fromkeys(collaborators))
+        N = len(collaborators)
 
         measurements = []
+        config = MeasurementConfig()
+        
         for file in files:
-            path = file.path
-            measurements.append(
-                self._m(
-                    self.FILE_OWNERSHIP_SCORE,
-                    1.0,  # This author touched this file once in this commit
-                    observation,
-                    context,
-                    path,
-                    {"author": canonical_dev, "coverage": 1.0},
+            weight = config.get_file_weight(file.path, file.status)
+            if weight == 0.0:
+                continue
+                
+            absolute_churn = getattr(file, "additions", 0) + getattr(file, "deletions", 0)
+            if absolute_churn == 0:
+                continue
+                
+            effective_ownership_score = (absolute_churn * weight) / N
+            if effective_ownership_score <= 0:
+                continue
+
+            for i, actor_id in enumerate(collaborators):
+                role = "primary" if i == 0 else "co-author"
+                measurements.append(
+                    self._m(
+                        self.FILE_OWNERSHIP_SCORE,
+                        effective_ownership_score,
+                        observation,
+                        context,
+                        file.path,
+                        {"author": actor_id, "coverage": 1.0, "role": role},
+                    )
                 )
-            )
 
         return measurements
 
