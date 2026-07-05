@@ -39,106 +39,76 @@ class EvidenceCorrelationEngine:
         self,
         evidence: tuple[Evidence, ...],
     ) -> tuple[EvidenceCorrelation, ...]:
+        from collections import defaultdict
         correlations = []
 
-        for index, source in enumerate(
-            evidence
-        ):
-            for target in evidence[
-                index + 1:
-            ]:
-                correlations.extend(
-                    self._correlate_pair(
-                        source,
-                        target,
-                    )
-                )
+        category_index = defaultdict(list)
+        measurement_index = defaultdict(list)
 
-        return tuple(
-            correlations
-        )
+        for item in evidence:
+            category_index[item.category].append(item)
+            for measurement_id in item.lineage.source_measurement_ids:
+                measurement_index[measurement_id].append(item)
 
-    def _correlate_pair(
-        self,
-        source: Evidence,
-        target: Evidence,
-    ) -> tuple[EvidenceCorrelation, ...]:
-        correlations = []
+        # 1. SEMANTIC & GRAPH (Category-based)
+        for category, sources in category_index.items():
+            # SEMANTIC
+            if len(sources) > 1:
+                for i, source in enumerate(sources):
+                    for target in sources[i + 1:]:
+                        correlations.append(
+                            EvidenceCorrelation(
+                                source_evidence_id=source.evidence_id,
+                                target_evidence_id=target.evidence_id,
+                                correlation_type=EvidenceCorrelationType.SEMANTIC,
+                                relationship=EvidenceRelationship.RELATED_TO,
+                                strength=min(source.confidence, target.confidence),
+                                explanation="Evidence items share an ontology category. This is correlation, not causation."
+                            )
+                        )
 
-        if source.category == target.category:
-            correlations.append(
-                EvidenceCorrelation(
-                    source_evidence_id=source.evidence_id,
-                    target_evidence_id=target.evidence_id,
-                    correlation_type=EvidenceCorrelationType.SEMANTIC,
-                    relationship=EvidenceRelationship.RELATED_TO,
-                    strength=min(
-                        source.confidence,
-                        target.confidence,
-                    ),
-                    explanation=(
-                        "Evidence items share an ontology category. "
-                        "This is correlation, not causation."
-                    ),
-                )
-            )
+            # GRAPH
+            for edge in self._ontology.relationships_from(category):
+                targets = category_index.get(edge.target_id, [])
+                for source in sources:
+                    for target in targets:
+                        correlations.append(
+                            EvidenceCorrelation(
+                                source_evidence_id=source.evidence_id,
+                                target_evidence_id=target.evidence_id,
+                                correlation_type=EvidenceCorrelationType.GRAPH,
+                                relationship=edge.relationship,
+                                strength=edge.confidence,
+                                explanation=edge.explanation or "Ontology graph relates these concepts."
+                            )
+                        )
 
-        source_measurements = set(
-            source.lineage.source_measurement_ids
-        )
-        target_measurements = set(
-            target.lineage.source_measurement_ids
-        )
-        overlap = source_measurements.intersection(
-            target_measurements
-        )
-        if overlap:
+        # 2. DEPENDENCY (Measurement-based)
+        dependency_map = defaultdict(set)
+        for measurement_id, items in measurement_index.items():
+            if len(items) > 1:
+                for i, source in enumerate(items):
+                    for target in items[i + 1:]:
+                        if source.evidence_id < target.evidence_id:
+                            key = (source, target)
+                        else:
+                            key = (target, source)
+                        dependency_map[key].add(measurement_id)
+
+        for (source, target), overlap in dependency_map.items():
+            source_measurements = set(source.lineage.source_measurement_ids)
+            target_measurements = set(target.lineage.source_measurement_ids)
+            union_len = max(1, len(source_measurements.union(target_measurements)))
             correlations.append(
                 EvidenceCorrelation(
                     source_evidence_id=source.evidence_id,
                     target_evidence_id=target.evidence_id,
                     correlation_type=EvidenceCorrelationType.DEPENDENCY,
                     relationship=EvidenceRelationship.DERIVED_FROM,
-                    strength=min(
-                        1.0,
-                        len(
-                            overlap
-                        )
-                        / max(
-                            1,
-                            len(
-                                source_measurements.union(
-                                    target_measurements
-                                )
-                            ),
-                        ),
-                    ),
-                    explanation=(
-                        "Evidence items share source measurements. "
-                        "Shared provenance does not imply causation."
-                    ),
+                    strength=min(1.0, len(overlap) / union_len),
+                    explanation="Evidence items share source measurements. Shared provenance does not imply causation."
                 )
             )
 
-        for edge in self._ontology.relationships_from(
-            source.category
-        ):
-            if edge.target_id == target.category:
-                correlations.append(
-                    EvidenceCorrelation(
-                        source_evidence_id=source.evidence_id,
-                        target_evidence_id=target.evidence_id,
-                        correlation_type=EvidenceCorrelationType.GRAPH,
-                        relationship=edge.relationship,
-                        strength=edge.confidence,
-                        explanation=(
-                            edge.explanation
-                            or "Ontology graph relates these concepts."
-                        ),
-                    )
-                )
-
-        return tuple(
-            correlations
-        )
+        return tuple(correlations)
 

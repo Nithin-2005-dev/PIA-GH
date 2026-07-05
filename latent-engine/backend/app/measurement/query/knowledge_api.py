@@ -3,8 +3,8 @@ from app.measurement.benchmarks.benchmark_datasets import BenchmarkDatasetRegist
 from app.cognitive.classifiers.mapping import MappingResolution
 from app.cognitive.classifiers.mapping import SignalMeasurementMapping
 from app.cognitive.classifiers.mapping import SignalMeasurementMappingRegistry
-from app.evidence.semantic.knowledge.measurement_knowledge import MeasurementDefinitionKnowledge
-from app.evidence.semantic.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
+from app.evidence.knowledge.measurement_knowledge import MeasurementDefinitionKnowledge
+from app.evidence.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
 from app.measurement.domain.registry import MeasurementRegistry
 from app.cognitive.classifiers.signal_ontology import SignalOntology
 from app.cognitive.classifiers.signal_ontology import SignalOntologyEdge

@@ -4,7 +4,7 @@ from app.measurement.benchmarks.benchmark_datasets import BenchmarkDatasetRegist
 from app.measurement.scientific.confidence_calibration import ConfidenceCalibrationModel
 from app.measurement.scientific.confidence_calibration import ConfidenceObservation
 from app.measurement.domain import Measurement
-from app.evidence.semantic.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
+from app.evidence.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
 from app.measurement.scientific.scientific_validation import ScientificValidationEngine
 from app.measurement.scientific.scientific_validation import ScientificValidationReport
 from app.measurement.scientific.standards import StandardsCatalog

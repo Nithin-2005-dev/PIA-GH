@@ -21,7 +21,8 @@ from app.evidence.domain import Evidence
 from app.evidence.domain import EvidenceLifecycle
 from app.evidence.domain import EvidencePriority
 from app.evidence.domain import EvidenceSeverity
-from app.evidence.graph import EvidenceKnowledgeGraph
+from app.evidence.graph import IEvidenceGraphStore
+from app.evidence.graph import LocalMemoryGraphStore
 from app.evidence.knowledge import EvidenceDefinition
 from app.evidence.knowledge import EvidenceKnowledgeBase
 from app.evidence.ontology import EvidenceOntology
@@ -40,7 +41,8 @@ __all__ = [
     "EvidenceContext",
     "EvidenceCorrelationEngine",
     "EvidenceDefinition",
-    "EvidenceKnowledgeGraph",
+    "IEvidenceGraphStore",
+    "LocalMemoryGraphStore",
     "EvidenceKnowledgeBase",
     "EvidenceLifecycle",
     "EvidenceOntology",

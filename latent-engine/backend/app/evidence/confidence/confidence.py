@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from datetime import datetime
+from datetime import timezone
 
 from app.evidence.domain import EvidenceMeasurementRef
 from app.evidence.knowledge.definitions import EvidenceDefinition
@@ -15,6 +17,16 @@ class EvidenceConfidenceScore:
 
 
 class EvidenceConfidenceEngine:
+
+    def __init__(self, category_half_lives_days: dict[str, int] | None = None):
+        self._category_half_lives_days = category_half_lives_days or {
+            "developer": 90,
+            "architecture": 365,
+            "ownership": 365,
+            "maintainability": 180,
+            "testing": 180,
+            "documentation": 365,
+        }
 
     def aggregate(
         self,
@@ -114,6 +126,27 @@ class EvidenceConfidenceEngine:
             )
         )
 
+        now = datetime.now(timezone.utc)
+        ages_in_days = []
+        for m in supporting_measurements:
+            try:
+                # Handle isoformat correctly, some might end in 'Z'
+                ts_str = m.timestamp.replace("Z", "+00:00")
+                dt = datetime.fromisoformat(ts_str)
+                # Ensure it's timezone aware
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                age = (now - dt).days
+                ages_in_days.append(max(0.0, float(age)))
+            except (ValueError, AttributeError):
+                ages_in_days.append(0.0)
+
+        average_age = sum(ages_in_days) / len(ages_in_days)
+        half_life = self._category_half_lives_days.get(definition.category, 365)
+        
+        # Exponential decay: 0.5 ^ (time / half_life)
+        temporal_decay = 0.5 ** (average_age / half_life)
+
         factors = {
             "measurement_confidence": measurement_confidence,
             "measurement_uncertainty": uncertainty_factor,
@@ -122,6 +155,7 @@ class EvidenceConfidenceEngine:
             "benchmark_quality": benchmark_quality,
             "historical_consistency": historical_consistency,
             "cross_source_agreement": cross_source_agreement,
+            "temporal_decay": temporal_decay,
             "validation_results": validation_factor,
         }
 
@@ -156,6 +190,6 @@ class EvidenceConfidenceEngine:
                 "confidence = product(measurement confidence, "
                 "uncertainty factor, source diversity, rule reliability, "
                 "benchmark quality, historical consistency, agreement, "
-                "validation factor)"
+                "temporal decay, validation factor)"
             ),
         )

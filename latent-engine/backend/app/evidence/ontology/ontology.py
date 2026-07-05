@@ -13,6 +13,9 @@ class EvidenceRelationship(Enum):
     CAUSED_BY = "caused_by"
     RELATED_TO = "related_to"
     IMPACTS = "impacts"
+    AUTHORED = "authored"
+    INTRODUCED_BUG_IN = "introduced_bug_in"
+    CAUSED_INCIDENT = "caused_incident"
 
 
 @dataclass(frozen=True)

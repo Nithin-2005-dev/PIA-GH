@@ -1,7 +1,8 @@
 from app.evidence.core import EvidenceContext
 from app.evidence.core import EvidencePackage
 from app.evidence.domain import Evidence
-from app.evidence.graph import EvidenceKnowledgeGraph
+from app.evidence.graph import IEvidenceGraphStore
+from app.evidence.graph import LocalMemoryGraphStore
 from app.evidence.query import EqlEngine
 from app.evidence.query import EqlParser
 from app.evidence.ranking import EvidenceRankingEngine
@@ -60,16 +61,23 @@ class EvidenceApi:
         self,
         eql: str,
         tenant_id: str | None = None,
-    ) -> tuple[Evidence, ...]:
+        limit: int = 100,
+        offset: int = 0,
+    ) -> dict[str, object]:
         query = EqlParser().parse(
-            eql
+            eql,
+            tenant_id or "global"
         )
-        return EqlEngine().query(
+        results = EqlEngine().query(
             self._package(
                 tenant_id
             ).evidence,
             query,
         )
+        return {
+            "total": len(results),
+            "data": results[offset : offset + limit]
+        }
 
     def explanation(
         self,
@@ -114,15 +122,10 @@ class EvidenceApi:
     def graph(
         self,
         tenant_id: str | None = None,
-    ) -> EvidenceKnowledgeGraph:
-        graph = EvidenceKnowledgeGraph()
-        for evidence in self._package(
-            tenant_id
-        ).evidence:
-            graph.add_evidence(
-                evidence
-            )
-        return graph
+    ) -> IEvidenceGraphStore:
+        from app.evidence.graph.builder import EvidenceGraphBuilder
+        builder = EvidenceGraphBuilder(LocalMemoryGraphStore())
+        return builder.build(self._package(tenant_id))
 
     def compare(
         self,
@@ -156,25 +159,31 @@ class EvidenceApi:
     def export(
         self,
         tenant_id: str | None = None,
-    ) -> tuple[dict[str, object], ...]:
-        return tuple(
-            {
-                "id": evidence.evidence_id,
-                "name": evidence.name,
-                "category": evidence.category,
-                "confidence": evidence.confidence,
-                "severity": evidence.severity.value,
-                "priority": evidence.priority.value,
-                "measurements": (
-                    evidence.lineage.source_measurement_ids
-                ),
-            }
-            for evidence in self._ranking_engine.rank(
-                self._package(
-                    tenant_id
-                ).evidence
-            )
+        limit: int = 100,
+        offset: int = 0,
+    ) -> dict[str, object]:
+        ranked = self._ranking_engine.rank(
+            self._package(
+                tenant_id
+            ).evidence
         )
+        return {
+            "total": len(ranked),
+            "data": tuple(
+                {
+                    "id": evidence.evidence_id,
+                    "name": evidence.name,
+                    "category": evidence.category,
+                    "confidence": evidence.confidence,
+                    "severity": evidence.severity.value,
+                    "priority": evidence.priority.value,
+                    "measurements": (
+                        evidence.lineage.source_measurement_ids
+                    ),
+                }
+                for evidence in ranked[offset : offset + limit]
+            )
+        }
 
     def _package(
         self,

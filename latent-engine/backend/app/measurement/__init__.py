@@ -49,10 +49,6 @@ _LEGACY_MODULE_ALIASES = {
     'lineage': 'app.measurement.query.lineage',
     'lineage_query': 'app.measurement.query.lineage_query',
     'knowledge_api': 'app.measurement.query.knowledge_api',
-    'knowledge_base': 'app.evidence.semantic.knowledge.knowledge_base',
-    'measurement_knowledge': 'app.evidence.semantic.knowledge.measurement_knowledge',
-    'domain_packs': 'app.evidence.semantic.knowledge.domain_packs',
-    'semantic_graph': 'app.evidence.semantic.knowledge.semantic_graph',
     'packs': 'app.measurement.plugins_runtime.packs',
     'plugins': 'app.measurement.plugins_runtime.plugins',
     'ml': 'app.measurement.plugins_runtime.ml',
@@ -80,7 +76,7 @@ from app.measurement.domain.registry import MeasurementRegistry
 from app.measurement.scientific.scientific_api import ScientificMeasurementApi
 from app.measurement.scientific.scientific_catalog import EnterpriseMeasurementCatalog
 from app.measurement.scientific.scientific_validation import ScientificValidationEngine
-from app.evidence.semantic.knowledge.semantic_graph import SemanticMeasurementGraph
+from app.evidence.knowledge.semantic_graph import SemanticMeasurementGraph
 from app.cognitive.classifiers.signal_classifier import SemanticSignalClassifier
 from app.cognitive.classifiers.signal_ontology import SignalOntology
 from app.cognitive.classifiers.signals import DefaultSignalCatalog, SignalRegistry

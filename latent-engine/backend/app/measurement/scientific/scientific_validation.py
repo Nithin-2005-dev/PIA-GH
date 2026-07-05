@@ -6,7 +6,7 @@ from app.measurement.domain import Measurement
 from app.measurement.domain import MeasurementDefinition
 from app.measurement.domain import ValidationResult
 from app.measurement.domain import ValidationStatus
-from app.evidence.semantic.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
+from app.evidence.knowledge.measurement_knowledge import SoftwareMeasurementKnowledgeBase
 from app.measurement.domain.registry import MeasurementRegistry
 
 

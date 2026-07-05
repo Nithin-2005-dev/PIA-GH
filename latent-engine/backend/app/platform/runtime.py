@@ -142,6 +142,19 @@ class BuiltPlatformRuntime:
         self,
     ) -> None:
         self.lifecycle.start()
+        
+        # Phase 32: Schedule Nightly Analysis Job safely off the real-time event bus
+        try:
+            from app.platform.jobs.analysis_job import NightlyAnalysisJob
+            analysis_job = self.provider.resolve(NightlyAnalysisJob)
+            self.runtime.scheduler.schedule_cron(
+                job_id="nightly_analysis_job",
+                handler=analysis_job.run,
+                cron="0 0 * * *"  # Run nightly at midnight
+            )
+            self.runtime.logger.info("NightlyAnalysisJob scheduled successfully via Cron.")
+        except Exception as e:
+            self.runtime.logger.error(f"Failed to schedule NightlyAnalysisJob: {e}")
 
     def shutdown(
         self,

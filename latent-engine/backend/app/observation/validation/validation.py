@@ -5,7 +5,7 @@ from enum import Enum
 
 from app.observation.domain import Observation
 from app.observation.domain import ObservationLifecycle
-from app.observation.ontology import ObservationOntology
+from app.evidence.ontology import ObservationOntology
 from app.observation.registry import ObservationRegistry
 
 

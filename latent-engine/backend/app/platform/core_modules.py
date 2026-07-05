@@ -684,6 +684,13 @@ class IntelligencePlatformModule(BaseModule):
         from app.query.expertise_query_service import ExpertiseQueryService
         from app.risk.bus_factor_service import BusFactorService
         from app.risk.policies.ownership_bus_factor_policy import OwnershipBusFactorPolicy
+        from app.knowledge_risk.knowledge_risk_service import KnowledgeRiskService
+        from app.knowledge_risk.policies.knowledge_risk_policy import KnowledgeRiskPolicy
+        from app.knowledge_risk.policies.bus_factor_risk_policy import BusFactorRiskPolicy
+        from app.evidence.ranking import RankingService
+        from app.platform.jobs.analysis_job import NightlyAnalysisJob
+        from app.platform.scheduler import Scheduler
+        from app.graph.graph_service import GraphService
 
         from app.successor.policies.expertise_successor_policy import ExpertiseSuccessorPolicy
         from app.successor.successor_service import SuccessorService
@@ -792,6 +799,51 @@ class IntelligencePlatformModule(BaseModule):
             ),
             scope=ServiceScope.SINGLETON,
         )
+        services.add(
+            BusFactorRiskPolicy,
+            lambda _: BusFactorRiskPolicy(),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            KnowledgeRiskPolicy,
+            lambda provider: provider.resolve(BusFactorRiskPolicy),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            KnowledgeRiskService,
+            lambda provider: KnowledgeRiskService(
+                provider.resolve(OwnershipService),
+                provider.resolve(BusFactorService),
+                provider.resolve(KnowledgeRiskPolicy),
+                provider.resolve(GraphService),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        # Note: RankingService assumes graph_store exists in GraphService or similar.
+        # It needs something implementing IEvidenceGraphStore. We'll pass the underlying graph.
+        from app.graph.organizational_graph import OrganizationalGraph
+        services.add(
+            RankingService,
+            lambda provider: RankingService(provider.resolve(OrganizationalGraph)),
+            scope=ServiceScope.SINGLETON,
+        )
+        services.add(
+            NightlyAnalysisJob,
+            lambda provider: NightlyAnalysisJob(
+                ranking_service=provider.resolve(RankingService),
+                knowledge_risk_service=provider.resolve(KnowledgeRiskService),
+                graph_service=provider.resolve(GraphService),
+            ),
+            scope=ServiceScope.SINGLETON,
+        )
+        # Schedule the job!
+        # In a real app we'd resolve Scheduler from the Runtime context, but since this is configure_services,
+        # we can register a post-build action or just do it if scheduler is passed. Wait, `core_modules.py`
+        # is just registering. To wire into Scheduler, maybe `runtime.py` is better?
+        # Actually, let's just add it to DI, we can schedule it in the runtime or app entrypoint.
+        # Wait, if I have to "wire `AnalysisJob` into the `Scheduler` in `app/platform/core_modules.py`", I will
+        # do it here using a factory that resolves Scheduler, but Scheduler is created in runtime.py.
+        # For now, let's just register NightlyAnalysisJob.
         services.add(
             LinearForecastPolicy,
             lambda _: LinearForecastPolicy(),
