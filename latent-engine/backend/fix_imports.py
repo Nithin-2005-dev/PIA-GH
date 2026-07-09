@@ -4,7 +4,7 @@ from pathlib import Path
 replacements = {
     "app.measurement.subsystem": "app.observation.ingestion.topology",
     "app.measurement.intelligence": "app.evidence.semantic.knowledge",
-    "app.measurement.signal_intelligence": "app.cognitive.classifiers"
+    "app.measurement.signal_intelligence": "app.kernel.classifiers"
 }
 
 def fix_imports(directory):

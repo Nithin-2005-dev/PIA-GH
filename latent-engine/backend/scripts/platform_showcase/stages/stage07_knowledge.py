@@ -60,7 +60,7 @@ class KnowledgeStage(PipelineStage):
         self,
         expertise_models,
     ) -> list[KnowledgeModel]:
-        from app.measurement.subsystem.boundary import SubsystemResolver
+        from app.observation.ingestion.topology.boundary import SubsystemResolver
         resolver = SubsystemResolver.default()
 
         grouped: defaultdict[tuple[str, str], list] = defaultdict(list)

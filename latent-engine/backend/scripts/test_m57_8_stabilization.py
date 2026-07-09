@@ -4,9 +4,9 @@ import os
 # Add the backend directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.provider import MockLLMProvider
-from app.cognitive.models import RepositorySession, ExecutionStatus, Intent
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.provider import MockLLMProvider
+from app.kernel.models import RepositorySession, ExecutionStatus, Intent
 
 def run_tests():
     print("=====================================================")
@@ -45,7 +45,7 @@ def run_tests():
     original_executor = runtime.executor
     class MockEmptyExecutor:
         def execute(self, graph, platform_result):
-            from app.cognitive.models import RetrievedEvidence
+            from app.kernel.models import RetrievedEvidence
             return RetrievedEvidence(artifacts=[]), []
             
     runtime.executor = MockEmptyExecutor()
@@ -61,7 +61,7 @@ def run_tests():
     provider_with_cache = MockLLMProvider()
     provider_with_cache._prompt_cache = {}  # Mock Provider doesn't have it natively, but GeminiProvider does.
     # To test caching, we'll import GeminiProvider but mock urlopen
-    from app.cognitive.provider import GeminiProvider
+    from app.kernel.provider import GeminiProvider
     gemini = GeminiProvider(api_key="fake", debug=False)
     # fake prompt hash hit
     gemini._prompt_cache["fake_hash"] = "cached response"

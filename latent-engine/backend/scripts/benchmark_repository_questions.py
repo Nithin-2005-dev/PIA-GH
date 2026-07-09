@@ -6,10 +6,10 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.cognitive.registry import CapabilityRegistry
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.models import AgentPolicy, ProviderPolicy, CommunicationMode
-from app.cognitive.provider_manager import ProviderManager
+from app.kernel.registry import CapabilityRegistry
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.models import AgentPolicy, ProviderPolicy, CommunicationMode
+from app.kernel.provider_manager import ProviderManager
 from tests.mocks.mock_provider import MockLLMProvider
 from app.platform.runtime import PlatformRuntime
 
@@ -37,7 +37,7 @@ def run_benchmark():
     runtime = CognitiveRuntime(provider_manager=provider_manager, agent_policy=AgentPolicy())
     session = runtime.create_session()
     
-    from app.cognitive.models import WorkspaceSession
+    from app.kernel.models import WorkspaceSession
     repo_session = WorkspaceSession(
         repository="facebook/react",
         commit_window=10,
@@ -73,7 +73,7 @@ def run_benchmark():
         elif "Compare" in q: mock_cap = "CompareBranches"
         
         with patch.object(provider, 'generate') as mock_gen:
-            from app.cognitive.provider import LLMResponse
+            from app.kernel.provider import LLMResponse
             def mock_generate(prompt, tools=(), **kwargs):
                 if "Classify the following user query" in prompt:
                     return LLMResponse(content='```json\n{"intent": "REPOSITORY_QUERY", "requires_repository": true}\n```')

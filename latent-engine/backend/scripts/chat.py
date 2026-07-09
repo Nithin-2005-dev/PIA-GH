@@ -11,12 +11,12 @@ from dataclasses import asdict
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.platform.runtime import PlatformRuntime
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.models import WorkspaceSession, CommunicationMode, ExecutionStatus, AgentPolicy
-from app.cognitive.provider import OpenAIProvider, GeminiProvider, OllamaProvider
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.models import WorkspaceSession, CommunicationMode, ExecutionStatus, AgentPolicy
+from app.kernel.provider import OpenAIProvider, GeminiProvider, OllamaProvider
 from tests.mocks.mock_provider import MockLLMProvider
-from app.cognitive.provider_manager import ProviderManager
-from app.cognitive.events import get_event_bus
+from app.kernel.provider_manager import ProviderManager
+from app.kernel.events import get_event_bus
 
 def main():
     parser = argparse.ArgumentParser(description="PIA Cognitive Agent Chat")
@@ -79,7 +79,7 @@ def main():
             runtime = CognitiveRuntime(provider_manager=ProviderManager([provider], AgentPolicy()), agent_policy=AgentPolicy())
             # Output diagnostic info
             print("Runtime Version     : M57.13")
-            from app.cognitive.adapter import PlatformResultAdapter
+            from app.kernel.adapter import PlatformResultAdapter
             print(f"Adapter Version     : {PlatformResultAdapter.version}")
             print("Platform Version    : v1")
             
@@ -99,7 +99,7 @@ def main():
     if args.audit_capabilities:
         print("\n[CAPABILITY AUDIT]")
         runtime = CognitiveRuntime(provider_manager=ProviderManager([provider], AgentPolicy()), agent_policy=AgentPolicy())
-        from app.cognitive.adapter import PlatformResultAdapter
+        from app.kernel.adapter import PlatformResultAdapter
         implemented = [c for c in runtime.registry.get_all() if c.contract.implemented.name == "IMPLEMENTED"]
         method_map = {
             "cap_top_contributors": "organization",

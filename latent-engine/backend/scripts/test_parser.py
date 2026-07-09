@@ -1,9 +1,9 @@
 import sys
 import os
 sys.path.append('.')
-from app.cognitive.semantic_parser import SemanticQueryParser
-from app.cognitive.provider import LLMProvider, LLMResponse
-from app.cognitive.models import Intent
+from app.kernel.semantic_parser import SemanticQueryParser
+from app.kernel.provider import LLMProvider, LLMResponse
+from app.kernel.models import Intent
 
 class DummyProvider(LLMProvider):
     def generate(self, prompt, **kwargs):

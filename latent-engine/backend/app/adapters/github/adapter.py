@@ -1,5 +1,5 @@
 from typing import Iterator
-from app.adapters.github.gateway import GitHubGateway
+from app.adapters.github.source import GitHubDataSource
 from app.observation.adapters.github import GitHubObservationTranslator
 from app.observation.domain import Observation
 from app.observation.integration import observation_to_event
@@ -12,23 +12,23 @@ class GitHubAdapter(ObservationSourcePort):
     """
     GitHub source adapter.
 
-    The adapter authenticates and fetches through the gateway, then delegates
+    The adapter authenticates and fetches through the source, then delegates
     translation to the observation layer. It does not calculate measurements,
     evidence, risk, confidence, or business meaning.
     """
 
     def __init__(
         self,
-        gateway: GitHubGateway,
+        source: GitHubDataSource,
         translator: GitHubObservationTranslator | None = None,
     ):
-        self._gateway = gateway
+        self._source = source
         self._translator = translator or GitHubObservationTranslator()
 
     def is_circuit_open(self) -> bool:
-        """Check if the underlying gateway's circuit breaker is open."""
-        if hasattr(self._gateway, "circuit_breaker"):
-            return self._gateway.circuit_breaker.is_open()
+        """Check if the underlying source's circuit breaker is open."""
+        if hasattr(self._source, "circuit_breaker"):
+            return self._source.circuit_breaker.is_open()
         return False
 
     @with_resilience(max_retries=3, base_delay=1.0)
@@ -37,8 +37,8 @@ class GitHubAdapter(ObservationSourcePort):
         query: EventQuery,
     ) -> Iterator[Observation]:
         owner, repo = query.identifier.split("/")
-        raw_commits_generator = self._gateway.fetch_commits(
-            query
+        raw_commits_generator = self._source.get_commits(
+            owner=owner, repo=repo, params=dict(query.filters) if query.filters else None
         )
 
         for raw_commit in raw_commits_generator:
@@ -46,7 +46,7 @@ class GitHubAdapter(ObservationSourcePort):
                 "sha"
             ]
 
-            details = self._gateway.fetch_commit_details(
+            details = self._source.get_commit_details(
                 owner=owner,
                 repo=repo,
                 sha=sha,

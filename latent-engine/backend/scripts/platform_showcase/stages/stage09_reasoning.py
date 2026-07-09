@@ -41,58 +41,85 @@ class ReasoningStage(PipelineStage):
             warning("No knowledge models available — skipping Reasoning layer")
             return
 
-        results = self._build_reasoning(knowledge, org_intel, causal_ctx)
+        from app.kernel.graph import GraphEngine, NodeType
+        from app.kernel.reasoning.builder import ReasoningGraphBuilder
+        from app.kernel.reasoning.rule_engine import RuleEngine, create_single_point_of_failure_rule
+        from app.kernel.reasoning.strategy import StrategyEngine
+        from app.kernel.models import CapabilityResult
+        
+        # We need to map Knowledge topics into mock CapabilityResults for the GraphEngine
+        # to consume, since the GraphEngine expects CapabilityResults as raw evidence.
+        mock_results = []
+        for k in knowledge:
+            mock_results.append(CapabilityResult(
+                capability_id=f"cap_{k.entity_type}",
+                status="SUCCESS",
+                confidence=k.average_confidence,
+                summary=f"Knowledge topic {k.topic} with score {k.average_score}",
+                evidence_ids=[],
+                raw_output={"topic": k.topic, "score": k.average_score},
+                normalized_output={},
+                warnings=[],
+                recommendations=[],
+                metadata={},
+                execution_time_ms=1.0
+            ))
+            
+        if org_intel:
+            for bf in org_intel.bus_factors:
+                mock_results.append(CapabilityResult(
+                    capability_id="cap_bus_factor",
+                    status="SUCCESS",
+                    confidence=1.0,
+                    summary=f"Bus factor for {bf.subject} is {bf.bus_factor}",
+                    evidence_ids=[],
+                    raw_output={"bus_factor": bf.bus_factor, "subject": bf.subject},
+                    normalized_output={},
+                    warnings=[],
+                    recommendations=[],
+                    metadata={},
+                    execution_time_ms=1.0
+                ))
+
+        graph = GraphEngine()
+        builder = ReasoningGraphBuilder(graph)
+        builder.build_from_results(mock_results)
+        
+        rule_engine = RuleEngine(graph)
+        rule_engine.register_rule(create_single_point_of_failure_rule())
+        
+        strategy = StrategyEngine(graph, rule_engine)
+        strategy.execute_reasoning_cycle()
+        
+        # Store the graph in context for the next stages
+        context.reasoning_graph = graph
+        
+        # Map GraphEngine INFERENCE nodes to legacy ReasoningResult for pipeline validation compatibility
+        results = []
+        inferences = graph.get_all_nodes(NodeType.INFERENCE)
+        for inf in inferences:
+            results.append(
+                ReasoningResult(
+                    id=inf.id,
+                    subject=inf.properties.get("entity", "Unknown"),
+                    conclusion=inf.properties.get("insight", "Unknown Inference"),
+                    confidence=round(inf.confidence, 4),
+                    uncertainty=round(1.0 - inf.confidence, 4),
+                    rationale=f"Derived from rule {inf.properties.get('rule_id', 'unknown')}",
+                    knowledge_ids=(),
+                )
+            )
+            
         context.reasoning_results = results
         context.metrics["reasoning_results"] = len(results)
 
-        section("Reasoning Results")
+        section("Reasoning Results (Graph OS)")
         metric("Knowledge Topics Consumed",    len(knowledge))
         metric("Org Intelligence Available",   "YES" if org_intel else "NO")
-        metric("Causal Intelligence Available","YES" if causal_ctx else "NO")
-        metric("Reasoning Results Produced",   len(results))
-        metric(
-            "Explainability Preserved",
-            "PASS" if all(r.rationale for r in results) else "FAIL",
-        )
-        metric(
-            "Confidence Propagated",
-            "PASS" if all(r.confidence >= 0.0 for r in results) else "FAIL",
-        )
+        metric("Graph Nodes Generated", len(graph.get_all_nodes()))
+        metric("Graph Edges Generated", len(graph._edges))
 
-        ranking(
-            "Reasoning Conclusions",
-            [
-                f"{r.subject:<28} {r.conclusion:<38} (conf={r.confidence:.3f})"
-                for r in results
-            ],
-        )
-
-        # ── Causal enrichment display ──────────────────────────────────
-        if causal_ctx and causal_ctx.root_causes:
-            section("Causal Rationale (M56)")
-            metric("Primary Root Cause", causal_ctx.primary_cause)
-            metric("Causal Confidence",  f"{causal_ctx.overall_confidence*100:.1f}%")
-
-            # Show the causal chain for the top 3 root causes
-            for rc in causal_ctx.root_causes[:3]:
-                print(
-                    f"\n  [{rc.rank}] {rc.subject}"
-                    f"  [{rc.mechanism_category}]"
-                    f"  overall_conf={rc.overall_confidence*100:.0f}%"
-                )
-                # Build a simple chain description from the mechanism name
-                mech = rc.mechanism.replace("_", " ").title()
-                print(f"    Mechanism  : {mech}")
-                print(
-                    f"    Confidence : evidence={rc.evidence_confidence*100:.0f}%  "
-                    f"rule={rc.rule_confidence*100:.0f}%  "
-                    f"propagation={rc.propagation_confidence*100:.0f}%"
-                )
-                if rc.evidence_ids:
-                    print(f"    Evidence   : {len(rc.evidence_ids)} item(s) — {rc.evidence_ids[0]}")
-                print()
-
-        success("Reasoning layer built from knowledge + organizational + causal intelligence")
+        success("Reasoning graph successfully built and rules evaluated")
 
     # ------------------------------------------------------------------
 

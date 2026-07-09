@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from app.domain.expertise_estimate import ExpertiseEstimate
 from app.evidence.core import EvidencePackage
-from app.graph.graph_edge import GraphEdge
+from app.graph.graph_edge import GraphEdge, EdgeConfidence, EdgeProvenance
 from app.graph.graph_node import GraphNode
 from app.graph.organizational_graph import OrganizationalGraph
+from app.graph.identity_resolution import IdentityResolver, IdentityEvidence, ResolutionStatus
+from app.graph.builders.edge_factory import EdgeFactory
 
 
 class KnowledgeGraphBuilder:
@@ -94,7 +96,88 @@ class KnowledgeGraphBuilder:
     ) -> OrganizationalGraph:
         nodes: dict[str, GraphNode] = {}
         edges: list[GraphEdge] = []
+        
+        identity_resolver = IdentityResolver()
+        edge_factory = EdgeFactory(identity_resolver)
 
+        # 1. Identity Resolution & Evidence Processing
+        if evidence_package is not None:
+            for evidence in evidence_package.evidence:
+                evidence_id = str(evidence.evidence_id)
+                nodes.setdefault(
+                    evidence_id,
+                    GraphNode(
+                        id=evidence_id,
+                        type="evidence",
+                        attributes={
+                            "name": evidence.name,
+                            "confidence": evidence.confidence,
+                        },
+                    ),
+                )
+                
+                # Extract Identities
+                target_entity = evidence.metadata.get("target_entity")
+                target_entity_type = evidence.metadata.get("target_entity_type")
+                if target_entity_type == "developer" and target_entity:
+                    identity_evidence = IdentityEvidence(
+                        alias=target_entity,
+                        score=evidence.confidence
+                    )
+                    # Pull more info if available in measurements
+                    for m in evidence.supporting_measurements:
+                        if hasattr(m, "provenance") and m.provenance:
+                            raw = getattr(m.provenance, "raw_refs", {})
+                            if raw.get("author_email"):
+                                identity_evidence = IdentityEvidence(
+                                    git_email=raw.get("author_email"),
+                                    commit_author=raw.get("author_name"),
+                                    alias=target_entity,
+                                    score=evidence.confidence
+                                )
+                                break
+                    identity_resolver.resolve(target_entity, identity_evidence)
+                
+                # Extract Semantic Edges via Factory
+                semantic_edges = edge_factory.build_from_evidence(evidence)
+                edges.extend(semantic_edges)
+                
+                # Existing Measurement edges
+                for measurement_id in evidence.lineage.source_measurement_ids:
+                    nodes.setdefault(
+                        measurement_id,
+                        GraphNode(
+                            id=measurement_id,
+                            type="measurement",
+                        ),
+                    )
+                    edges.append(
+                        GraphEdge(
+                            source_id=measurement_id,
+                            target_id=evidence_id,
+                            relationship="SUPPORTS_EVIDENCE",
+                            confidence=EdgeConfidence(
+                                evidence_confidence=evidence.confidence
+                            ),
+                            provenance=EdgeProvenance(evidence_id=evidence_id, algorithm="legacy", created_by="KnowledgeGraphBuilder"),
+                            weight=evidence.confidence,
+                        )
+                    )
+                    
+        # 2. Add Identity Nodes to Graph
+        for candidate in identity_resolver.get_all_candidates():
+            nodes[candidate.id] = GraphNode(
+                id=candidate.id,
+                type="developer",
+                attributes={
+                    "resolution_status": candidate.resolution_status.value,
+                    "aliases": list(candidate.aliases),
+                    "confidence": candidate.confidence,
+                    "ambiguous_candidates": candidate.candidates
+                }
+            )
+
+        # 3. Add Knowledge and Expertise Models
         for model in knowledge_models:
             nodes[model.id] = GraphNode(
                 id=model.id,
@@ -113,6 +196,13 @@ class KnowledgeGraphBuilder:
                 if model.category == "module"
                 else model.category
             )
+            # Ensure subject node exists
+            if model.subject not in nodes:
+                nodes[model.subject] = GraphNode(
+                    id=model.subject,
+                    type=model.category
+                )
+                
             nodes[model.id] = GraphNode(
                 id=model.id,
                 type="expertise",
@@ -137,40 +227,11 @@ class KnowledgeGraphBuilder:
                         source_id=evidence_id,
                         target_id=model.id,
                         relationship="SUPPORTS_EXPERTISE",
+                        confidence=EdgeConfidence(evidence_confidence=model.confidence),
+                        provenance=EdgeProvenance(evidence_id=evidence_id, algorithm="legacy", created_by="KnowledgeGraphBuilder"),
                         weight=model.confidence,
                     )
                 )
-
-        if evidence_package is not None:
-            for evidence in evidence_package.evidence:
-                evidence_id = str(evidence.evidence_id)
-                nodes.setdefault(
-                    evidence_id,
-                    GraphNode(
-                        id=evidence_id,
-                        type="evidence",
-                        attributes={
-                            "name": evidence.name,
-                            "confidence": evidence.confidence,
-                        },
-                    ),
-                )
-                for measurement_id in evidence.lineage.source_measurement_ids:
-                    nodes.setdefault(
-                        measurement_id,
-                        GraphNode(
-                            id=measurement_id,
-                            type="measurement",
-                        ),
-                    )
-                    edges.append(
-                        GraphEdge(
-                            source_id=measurement_id,
-                            target_id=evidence_id,
-                            relationship="SUPPORTS_EVIDENCE",
-                            weight=evidence.confidence,
-                        )
-                    )
 
         knowledge_nodes = [
             node
@@ -194,6 +255,8 @@ class KnowledgeGraphBuilder:
                             source_id=model.id,
                             target_id=node.id,
                             relationship="SUPPORTS_KNOWLEDGE",
+                            confidence=EdgeConfidence(evidence_confidence=model.confidence),
+                            provenance=EdgeProvenance(algorithm="legacy", created_by="KnowledgeGraphBuilder"),
                             weight=model.confidence,
                         )
                     )

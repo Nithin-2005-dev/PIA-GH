@@ -5,10 +5,10 @@ import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.models import Intent, WorkspaceSession, ExecutionStatus, AgentPolicy, StoppingPolicy
-from app.cognitive.provider import GeminiProvider, MockLLMProvider
-from app.cognitive.provider_manager import ProviderManager
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.models import Intent, WorkspaceSession, ExecutionStatus, AgentPolicy, StoppingPolicy
+from app.kernel.provider import GeminiProvider, MockLLMProvider
+from app.kernel.provider_manager import ProviderManager
 from app.platform.runtime import PlatformRuntime
 
 # 10 Operational E2E Tests for M57.12

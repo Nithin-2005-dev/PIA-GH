@@ -8,9 +8,9 @@ from dataclasses import asdict
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.platform.runtime import PlatformRuntime
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.provider import MockLLMProvider
-from app.cognitive.models import Intent, CognitiveTopic, RepositorySession, ExecutionStatus
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.provider import MockLLMProvider
+from app.kernel.models import Intent, CognitiveTopic, RepositorySession, ExecutionStatus
 
 # ─── Benchmark Dataset ───
 BENCHMARK_QUESTIONS = [

@@ -24,11 +24,11 @@ _LEGACY_MODULE_ALIASES = {
     'contracts': 'app.measurement.domain.contracts',
     'ontology': 'app.measurement.domain.ontology',
     'registry': 'app.measurement.domain.registry',
-    'signals': 'app.cognitive.classifiers.signals',
-    'signal_ontology': 'app.cognitive.classifiers.signal_ontology',
-    'signal_classifier': 'app.cognitive.classifiers.signal_classifier',
-    'mapping': 'app.cognitive.classifiers.mapping',
-    'signal_validation': 'app.cognitive.classifiers.signal_validation',
+    'signals': 'app.kernel.classifiers.signals',
+    'signal_ontology': 'app.kernel.classifiers.signal_ontology',
+    'signal_classifier': 'app.kernel.classifiers.signal_classifier',
+    'mapping': 'app.kernel.classifiers.mapping',
+    'signal_validation': 'app.kernel.classifiers.signal_validation',
     'scientific_api': 'app.measurement.scientific.scientific_api',
     'scientific_catalog': 'app.measurement.scientific.scientific_catalog',
     'scientific_validation': 'app.measurement.scientific.scientific_validation',
@@ -70,16 +70,16 @@ from app.measurement.domain import (
 )
 from app.measurement.core.engine import MeasurementEngine
 from app.measurement.core.execution import MeasurementExecutionPlanner
-from app.cognitive.classifiers.mapping import SignalToMeasurementMapper
+from app.kernel.classifiers.mapping import SignalToMeasurementMapper
 from app.measurement.domain.ontology import MeasurementOntology
 from app.measurement.domain.registry import MeasurementRegistry
 from app.measurement.scientific.scientific_api import ScientificMeasurementApi
 from app.measurement.scientific.scientific_catalog import EnterpriseMeasurementCatalog
 from app.measurement.scientific.scientific_validation import ScientificValidationEngine
 from app.evidence.knowledge.semantic_graph import SemanticMeasurementGraph
-from app.cognitive.classifiers.signal_classifier import SemanticSignalClassifier
-from app.cognitive.classifiers.signal_ontology import SignalOntology
-from app.cognitive.classifiers.signals import DefaultSignalCatalog, SignalRegistry
+from app.kernel.classifiers.signal_classifier import SemanticSignalClassifier
+from app.kernel.classifiers.signal_ontology import SignalOntology
+from app.kernel.classifiers.signals import DefaultSignalCatalog, SignalRegistry
 
 __all__ = [
     'DefaultMeasurementCatalog',

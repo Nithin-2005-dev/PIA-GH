@@ -1,4 +1,4 @@
-"""Stage 08 — Organization Intelligence.
+"""Stage 08 - Organization Intelligence.
 
 Consumes canonical Expertise Models and Knowledge Models.
 Produces OrgIntelligenceResult stored in context.org_intelligence.
@@ -14,7 +14,7 @@ Architecture:
     Coverage +
     Concentration +
     Bus Factor        ──►  Health
-    Knowledge Models  ──►  Forecast (unavailable — single snapshot)
+    Knowledge Models  ──►  Forecast (unavailable - single snapshot)
     Decisions +
     Health + Risk     ──►  Recommendations
 
@@ -47,7 +47,7 @@ from .base import PipelineStage
 
 
 # ===========================================================================
-# Internal canonical adapter (private — never imported outside this file)
+# Internal canonical adapter (private - never imported outside this file)
 # ===========================================================================
 
 
@@ -57,7 +57,7 @@ class _ExpertiseProxy(NamedTuple):
     policy algorithms (module_ref.id, raw_score, confidence) without
     importing ExpertiseProjection, ExpertiseEstimate, or EntityRef.
 
-    This is a structural adapter:  ExpertiseModel → policy input shape.
+    This is a structural adapter:  ExpertiseModel -> policy input shape.
     """
     subject: str
     category: str
@@ -91,7 +91,7 @@ class _Ref(NamedTuple):
 def _proxies_from_expertise(
     expertise_models: list[ExpertiseModel],
 ) -> list[_ExpertiseProxy]:
-    """Convert canonical ExpertiseModel list → proxy list."""
+    """Convert canonical ExpertiseModel list -> proxy list."""
     return [
         _ExpertiseProxy(
             subject=m.subject,
@@ -105,7 +105,7 @@ def _proxies_from_expertise(
 
 
 # ===========================================================================
-# Ownership — reuses ExpertiseOwnershipPolicy algorithm natively
+# Ownership - reuses ExpertiseOwnershipPolicy algorithm natively
 # ===========================================================================
 
 
@@ -146,7 +146,7 @@ def _compute_ownership(
 
 
 # ===========================================================================
-# Coverage — reuses ExpertiseCoveragePolicy algorithm natively
+# Coverage - reuses ExpertiseCoveragePolicy algorithm natively
 # ===========================================================================
 
 
@@ -168,9 +168,9 @@ def _compute_coverage(
     Coverage = average_expertise × coverage_multiplier(expert_count)
 
     Levels:
-        >= 0.70  → STRONG
-        >= 0.40  → MODERATE
-        else     → WEAK
+        >= 0.70  -> STRONG
+        >= 0.40  -> MODERATE
+        else     -> WEAK
     """
     entries: list[CoverageEntry] = []
 
@@ -204,7 +204,7 @@ def _compute_coverage(
 
 
 # ===========================================================================
-# Concentration — reuses ExpertiseConcentrationPolicy algorithm natively
+# Concentration - reuses ExpertiseConcentrationPolicy algorithm natively
 # ===========================================================================
 
 
@@ -215,9 +215,9 @@ def _compute_concentration(
     Concentration = max ownership percentage in a subject group.
 
     Risk levels:
-        >= 0.70  → HIGH
-        >= 0.40  → MEDIUM
-        else     → LOW
+        >= 0.70  -> HIGH
+        >= 0.40  -> MEDIUM
+        else     -> LOW
     """
     by_subject: dict[str, list[float]] = defaultdict(list)
     categories: dict[str, str] = {}
@@ -250,7 +250,7 @@ def _compute_concentration(
 
 
 # ===========================================================================
-# Bus Factor — reuses OwnershipBusFactorPolicy algorithm natively
+# Bus Factor - reuses OwnershipBusFactorPolicy algorithm natively
 # ===========================================================================
 
 
@@ -260,11 +260,7 @@ def _compute_bus_factors(
     """
     Bus factor = number of PRIMARY + SECONDARY owners.
     Coverage   = sum of ownership percentages for those owners.
-
-    Risk levels (same as OwnershipBusFactorPolicy):
-        bus_factor == 1  → HIGH
-        bus_factor == 2  → MEDIUM
-        else             → LOW
+    Distribution metrics are returned raw; risk criticality belongs to the Reasoning Engine.
     """
     by_subject: dict[str, list[OwnershipEntry]] = defaultdict(list)
     categories: dict[str, str] = {}
@@ -281,13 +277,10 @@ def _compute_bus_factors(
         ]
         bus_factor = max(len(key_owners), 1)
         coverage = sum(o.ownership_percentage for o in key_owners)
-
-        if bus_factor == 1:
-            risk = "HIGH"
-        elif bus_factor == 2:
-            risk = "MEDIUM"
-        else:
-            risk = "LOW"
+        
+        # Raw distribution metrics
+        contributors = len(owners)
+        ownership_concentration = max(o.ownership_percentage for o in owners) if owners else 0.0
 
         entries.append(
             BusFactorEntry(
@@ -295,7 +288,9 @@ def _compute_bus_factors(
                 category=categories.get(subject, "unknown"),
                 bus_factor=bus_factor,
                 coverage=round(coverage, 4),
-                risk_level=risk,
+                contributors=contributors,
+                ownership_concentration=round(ownership_concentration, 4),
+                confidence=1.0 # Derived from the pipeline
             )
         )
 
@@ -304,7 +299,7 @@ def _compute_bus_factors(
 
 
 # ===========================================================================
-# Successor — reuses ExpertiseSuccessorPolicy algorithm natively
+# Successor - reuses ExpertiseSuccessorPolicy algorithm natively
 # ===========================================================================
 
 
@@ -358,7 +353,7 @@ def _compute_successors(
 
 
 # ===========================================================================
-# Knowledge Risk — composition of ownership + bus_factor
+# Knowledge Risk - composition of ownership + bus_factor
 # ===========================================================================
 
 
@@ -423,7 +418,7 @@ def _compute_knowledge_risks(
 
 
 # ===========================================================================
-# Health — composition of coverage + concentration + bus_factor
+# Health - composition of coverage + concentration + bus_factor
 # ===========================================================================
 
 
@@ -497,13 +492,13 @@ def _compute_recommendations(
     Decisions are produced downstream in stage10 from Reasoning output.
 
     Types:
-        organizational  — process / team / ownership actions
-        engineering     — code / architecture / documentation actions
-        executive       — strategic / investment / escalation actions
+        organizational  - process / team / ownership actions
+        engineering     - code / architecture / documentation actions
+        executive       - strategic / investment / escalation actions
     """
     entries: list[RecommendationEntry] = []
 
-    # Knowledge risk → organizational + engineering recommendations
+    # Knowledge risk -> organizational + engineering recommendations
     for risk in knowledge_risks:
         if risk.risk_level == "HIGH":
             entries.append(RecommendationEntry(
@@ -541,7 +536,7 @@ def _compute_recommendations(
                 confidence=0.75,
             ))
 
-    # Successor readiness → organizational recommendations
+    # Successor readiness -> organizational recommendations
     successor_subjects = {s.primary_subject for s in successors}
     for subj in successor_subjects:
         entries.append(RecommendationEntry(
@@ -556,7 +551,7 @@ def _compute_recommendations(
             confidence=0.70,
         ))
 
-    # Health → executive recommendations
+    # Health -> executive recommendations
     if health.critical_count > 0:
         entries.append(RecommendationEntry(
             action_type="executive",
@@ -573,7 +568,7 @@ def _compute_recommendations(
             confidence=0.88,
         ))
 
-    # Sort: high → medium → low, then by confidence descending
+    # Sort: high -> medium -> low, then by confidence descending
     priority_rank = {"high": 2, "medium": 1, "low": 0}
     entries.sort(
         key=lambda e: (priority_rank.get(e.priority, 0), e.confidence),
@@ -592,10 +587,10 @@ def _build_validation_matrix() -> list[ValidationMatrixEntry]:
     Compares legacy pipeline output capability vs canonical implementation.
 
     Match quality:
-        EXACT     — same algorithm, same data shape, expected identical results
-        CLOSE     — same algorithm, adapted inputs, minor numerical differences
-        DIVERGED  — fundamentally different input (e.g., time-series vs snapshot)
-        UNAVAILABLE — requires data the canonical pipeline does not yet produce
+        EXACT     - same algorithm, same data shape, expected identical results
+        CLOSE     - same algorithm, adapted inputs, minor numerical differences
+        DIVERGED  - fundamentally different input (e.g., time-series vs snapshot)
+        UNAVAILABLE - requires data the canonical pipeline does not yet produce
     """
     return [
         ValidationMatrixEntry(
@@ -657,7 +652,7 @@ def _build_validation_matrix() -> list[ValidationMatrixEntry]:
             canonical_available=True,
             match_quality="EXACT",
             notes=(
-                "KnowledgeRiskPolicy thresholds reused: bus_factor <= 1 → HIGH, etc. "
+                "KnowledgeRiskPolicy thresholds reused: bus_factor <= 1 -> HIGH, etc. "
                 "Composed from canonical bus_factor + ownership results."
             ),
         ),
@@ -722,16 +717,16 @@ def _native_rewrite_list() -> list[tuple[str, str]]:
     'Rewrite Required' = cannot be adapted; needs native rewrite in future.
     """
     return [
-        ("Ownership",             "Adapter   — ExpertiseOwnershipPolicy reused via _ExpertiseProxy"),
-        ("Coverage",              "Adapter   — ExpertiseCoveragePolicy algorithm inlined natively"),
-        ("Concentration",         "Native    — derived directly from canonical ownership entries"),
-        ("Bus Factor",            "Adapter   — OwnershipBusFactorPolicy thresholds reused natively"),
-        ("Successor",             "Adapter   — ExpertiseSuccessorPolicy logic reused natively"),
-        ("Knowledge Risk",        "Native    — composed from canonical bus_factor + ownership"),
-        ("Health",                "Native    — composed from canonical coverage + concentration + bus_factor"),
-        ("Forecast",              "Native    — canonical pipeline handles temporal snapshots natively"),
-        ("Organization Dashboard","Native    — aggregated from all canonical org analytics above"),
-        ("Recommendations",       "Native    — derived from knowledge risk + successors + health"),
+        ("Ownership",             "Adapter   - ExpertiseOwnershipPolicy reused via _ExpertiseProxy"),
+        ("Coverage",              "Adapter   - ExpertiseCoveragePolicy algorithm inlined natively"),
+        ("Concentration",         "Native    - derived directly from canonical ownership entries"),
+        ("Bus Factor",            "Adapter   - OwnershipBusFactorPolicy thresholds reused natively"),
+        ("Successor",             "Adapter   - ExpertiseSuccessorPolicy logic reused natively"),
+        ("Knowledge Risk",        "Native    - composed from canonical bus_factor + ownership"),
+        ("Health",                "Native    - composed from canonical coverage + concentration + bus_factor"),
+        ("Forecast",              "Native    - canonical pipeline handles temporal snapshots natively"),
+        ("Organization Dashboard","Native    - aggregated from all canonical org analytics above"),
+        ("Recommendations",       "Native    - derived from knowledge risk + successors + health"),
     ]
 
 
@@ -742,7 +737,7 @@ def _native_rewrite_list() -> list[tuple[str, str]]:
 
 class OrganizationIntelligenceStage(PipelineStage):
     """
-    Stage 08 — Organization Intelligence
+    Stage 08 - Organization Intelligence
 
     Produces OrgIntelligenceResult from canonical Expertise and Knowledge models.
     Stored in context.org_intelligence for consumption by:
@@ -760,7 +755,7 @@ class OrganizationIntelligenceStage(PipelineStage):
         graph = getattr(context, "knowledge_graph", None)
         
         if not graph:
-            warning("No Knowledge Graph available — skipping Organization Intelligence")
+            warning("No Knowledge Graph available - skipping Organization Intelligence")
             return
 
         # Query the canonical graph service shape. NetworkX is tolerated only
@@ -1008,7 +1003,7 @@ class OrganizationIntelligenceStage(PipelineStage):
         metric("Explanation Quality",       causal.explanation_quality)
 
         ranking(
-            "Root Causes — Ranked by Confidence",
+            "Root Causes - Ranked by Confidence",
             [
                 (
                     f"[{rc.rank}] {rc.subject:<36} "
@@ -1085,7 +1080,7 @@ class OrganizationIntelligenceStage(PipelineStage):
         bus_factors: list[BusFactorEntry],
     ) -> None:
         """Show full traceability chain for the top risk subject."""
-        section("Lineage — Canonical Traceability")
+        section("Lineage - Canonical Traceability")
 
         high_risks = [r for r in knowledge_risks if r.risk_level == "HIGH"]
         if not high_risks:
@@ -1102,27 +1097,27 @@ class OrganizationIntelligenceStage(PipelineStage):
         print()
         print(f"  Bus Factor = {top.bus_factor}")
         print(f"      |")
-        print(f"      ↓")
+        print(f"      |")
         print(f"  Ownership Analysis  ({top.owner_count} owner(s))")
         print(f"      |")
-        print(f"      ↓")
+        print(f"      |")
         print(f"  Expertise Models  ({len(relevant)} model(s) in category '{top.subject}')")
         for m in relevant[:3]:
-            print(f"      · {m.subject:<30} score={m.score:.3f} conf={m.confidence:.3f}")
+            print(f"      - {m.subject:<30} score={m.score:.3f} conf={m.confidence:.3f}")
         print(f"      |")
-        print(f"      ↓")
+        print(f"      |")
         evidence_ids = []
         for m in relevant[:3]:
             evidence_ids.extend(m.evidence_ids[:2])
         if evidence_ids:
             print(f"  Evidence  ({len(evidence_ids)} sample evidence item(s))")
             for eid in evidence_ids[:4]:
-                print(f"      · {eid}")
+                print(f"      |")
         else:
             print(f"  Evidence  (IDs not traced to this level)")
         print(f"      |")
-        print(f"      ↓")
-        print(f"  Measurements  →  Observations  →  GitHub Commits")
+        print(f"      |")
+        print(f"  Measurements  ->  Observations  ->  GitHub Commits")
 
     def _display_validation_matrix(
         self, matrix: tuple[ValidationMatrixEntry, ...]
@@ -1131,8 +1126,8 @@ class OrganizationIntelligenceStage(PipelineStage):
         metric(f"{'Domain':<28} {'Legacy':<8} {'Canonical':<10} {'Match':<14} Notes", "")
         print("-" * 100)
         for entry in matrix:
-            legacy_sym    = "✔" if entry.legacy_available    else "✗"
-            canonical_sym = "✔" if entry.canonical_available else "✗"
+            legacy_sym    = "[Y]" if entry.legacy_available    else "✗"
+            canonical_sym = "[Y]" if entry.canonical_available else "✗"
             print(
                 f"  {entry.domain:<26} {legacy_sym:<8} {canonical_sym:<10} "
                 f"{entry.match_quality:<14} {entry.notes[:55]}"
@@ -1141,6 +1136,6 @@ class OrganizationIntelligenceStage(PipelineStage):
     def _display_native_rewrite(
         self, rewrite_list: tuple[tuple[str, str], ...]
     ) -> None:
-        section("Service Classification — Adapter vs Native Rewrite")
+        section("Service Classification - Adapter vs Native Rewrite")
         for service, status in rewrite_list:
             print(f"  {service:<28} {status}")

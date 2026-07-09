@@ -5,9 +5,9 @@ import json
 # Add backend to path so we can import from app
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from app.cognitive.semantic_parser import SemanticQueryParser
-from app.cognitive.goal_builder import GoalGraphBuilder
-from app.cognitive.provider import LLMProvider
+from app.kernel.semantic_parser import SemanticQueryParser
+from app.kernel.goal_builder import GoalGraphBuilder
+from app.kernel.provider import LLMProvider
 
 class MockProvider(LLMProvider):
     def generate(self, prompt: str, system: str = "", temperature: float = 0.0) -> str:

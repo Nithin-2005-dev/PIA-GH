@@ -11,10 +11,12 @@ class GitHubAdapterFactory:
         token: str,
     ):
         from app.adapters.github.adapter import GitHubAdapter
-        from app.adapters.github.rest_gateway import GitHubRestGateway
+        from app.adapters.github.source import LiveGitHubSource
+        from app.platform.secrets import MockSecretProvider
 
+        secret_provider = MockSecretProvider({"GITHUB_TOKEN": token})
         return GitHubAdapter(
-            gateway=GitHubRestGateway(token=token)
+            source=LiveGitHubSource(secret_provider=secret_provider)
         )
 
 
@@ -211,7 +213,7 @@ class EvidencePlatformModule(BaseModule):
         services: ServiceCollection,
     ) -> None:
         from app.evidence.synthesis.engine import EvidenceSynthesisEngine
-        from app.evidence.semantic import SemanticEvidenceEngine
+        from app.evidence.knowledge.semantic_engine import SemanticEvidenceEngine
 
         services.add(
             EvidenceSynthesisEngine,
@@ -492,14 +494,7 @@ class AgentPlatformModule(BaseModule):
         self,
         services: ServiceCollection,
     ) -> None:
-        from app.agent.intent_classifier import IntentClassifier
-
-        services.add(
-            IntentClassifier,
-            IntentClassifier,
-            scope=ServiceScope.SINGLETON,
-        )
-
+        pass
 
 
 class CausalPlatformModule(BaseModule):

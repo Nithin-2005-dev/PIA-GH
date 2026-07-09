@@ -44,18 +44,42 @@ class GitHubRestGateway(GitHubGateway):
                 time.sleep(sleep_time)
 
     def _make_request(self, url: str, params: dict = None) -> dict:
-        def fetch():
-            response = requests.get(
-                url,
-                headers=self._get_headers(),
-                params=params or {},
-                timeout=30,
-            )
-            self._handle_rate_limit(response)
-            response.raise_for_status()
-            return response.json()
-            
-        return self.circuit_breaker.call(fetch)
+        import time
+        import random
+        import logging
+        from http.client import RemoteDisconnected
+        _logger = logging.getLogger(__name__)
+
+        max_retries = 3
+        for attempt in range(max_retries + 1):
+            def fetch():
+                response = requests.get(
+                    url,
+                    headers=self._get_headers(),
+                    params=params or {},
+                    timeout=(10, 30),  # (connect_timeout, read_timeout)
+                )
+                self._handle_rate_limit(response)
+                response.raise_for_status()
+                return response.json()
+
+            try:
+                return self.circuit_breaker.call(fetch)
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                RemoteDisconnected,
+            ) as e:
+                if attempt >= max_retries:
+                    _logger.error(f"GitHub request failed after {max_retries} retries: {e}")
+                    raise
+                delay = min(2 ** attempt, 5) + random.uniform(0, 0.5)
+                _logger.warning(
+                    f"Transient network error (attempt {attempt + 1}/{max_retries}): {e}. "
+                    f"Retrying in {delay:.1f}s..."
+                )
+                time.sleep(delay)
+
 
     def fetch_commits(
         self,
@@ -70,9 +94,13 @@ class GitHubRestGateway(GitHubGateway):
         )
 
         params = dict(query.filters) if query.filters else {}
-        params["per_page"] = 100
+        
+        # Support either 'limit' or 'per_page' to bound the total fetch
+        limit = params.pop("limit", None) or params.pop("per_page", None)
+        params["per_page"] = min(limit, 100) if limit else 100
         page = 1
         
+        yielded_count = 0
         while True:
             params["page"] = page
             page_data = self._make_request(url, params=params)
@@ -82,8 +110,11 @@ class GitHubRestGateway(GitHubGateway):
                 
             for item in page_data:
                 yield item
+                yielded_count += 1
+                if limit and yielded_count >= limit:
+                    return
                 
-            if len(page_data) < 100:
+            if len(page_data) < params["per_page"]:
                 break
             page += 1
 

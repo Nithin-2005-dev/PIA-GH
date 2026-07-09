@@ -4,9 +4,9 @@ import sys
 # Add backend directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.cognitive.provider import MockLLMProvider
-from app.cognitive.router import IntentRouter
-from app.cognitive.models import Intent, CognitiveTopic
+from app.kernel.provider import MockLLMProvider
+from app.kernel.router import IntentRouter
+from app.kernel.models import Intent, CognitiveTopic
 
 def main():
     print("=====================================================")

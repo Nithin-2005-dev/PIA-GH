@@ -1,6 +1,6 @@
 from typing import Sequence
-from app.cognitive.models import AgentAction
-from app.cognitive.provider import LLMResponse
+from app.kernel.models import AgentAction
+from app.kernel.provider import LLMResponse
 
 class MockLLMProvider:
     """A deterministic mock LLM for testing without API keys."""

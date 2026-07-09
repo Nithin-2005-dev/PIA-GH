@@ -4,9 +4,9 @@ import os
 # Add the backend directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.provider import MockLLMProvider
-from app.cognitive.models import RepositorySession
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.provider import MockLLMProvider
+from app.kernel.models import RepositorySession
 
 def run_tests():
     print("=====================================================")

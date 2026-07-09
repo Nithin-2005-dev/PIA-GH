@@ -5,9 +5,9 @@ import time
 # Add the project root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.cognitive.registry import CapabilityRegistry
-from app.cognitive.adapter import PlatformResultAdapter
-from app.cognitive.interpreters import INTERPRETERS
+from app.kernel.registry import CapabilityRegistry
+from app.kernel.adapter import PlatformResultAdapter
+from app.kernel.interpreters import INTERPRETERS
 from app.platform.runtime import PlatformRuntime
 from dataclasses import is_dataclass
 

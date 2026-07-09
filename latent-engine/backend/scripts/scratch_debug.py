@@ -1,11 +1,11 @@
 import sys
 import os
 sys.path.append('.')
-from app.cognitive.semantic_parser import SemanticQueryParser
-from app.cognitive.provider import LLMProvider
-from app.cognitive.goal_builder import GoalGraphBuilder
-from app.cognitive.retriever import CapabilityRetriever
-from app.cognitive.registry import CapabilityRegistry
+from app.kernel.semantic_parser import SemanticQueryParser
+from app.kernel.provider import LLMProvider
+from app.kernel.goal_builder import GoalGraphBuilder
+from app.kernel.retriever import CapabilityRetriever
+from app.kernel.registry import CapabilityRegistry
 
 class DummyProvider(LLMProvider):
     def generate(self, prompt, **kwargs):

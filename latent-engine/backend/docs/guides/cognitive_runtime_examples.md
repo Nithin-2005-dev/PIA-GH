@@ -7,8 +7,8 @@ This document provides code-first, practical examples of integrating and queryin
 ```python
 import os
 from app.platform.runtime import PlatformRuntime
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.provider import OpenAIProvider
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.provider import OpenAIProvider
 
 # 1. Run deterministic pipeline
 platform = PlatformRuntime.create()

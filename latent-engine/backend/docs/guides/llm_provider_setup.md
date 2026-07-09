@@ -8,7 +8,7 @@ Here is how you configure each supported provider.
 
 ### OpenAI
 ```python
-from app.cognitive.provider import OpenAIProvider
+from app.kernel.provider import OpenAIProvider
 
 provider = OpenAIProvider(
     api_key=os.environ["OPENAI_API_KEY"],
@@ -18,7 +18,7 @@ provider = OpenAIProvider(
 
 ### Google Gemini
 ```python
-from app.cognitive.provider import GeminiProvider
+from app.kernel.provider import GeminiProvider
 
 provider = GeminiProvider(
     api_key=os.environ["GEMINI_API_KEY"],
@@ -28,7 +28,7 @@ provider = GeminiProvider(
 
 ### Ollama (Local)
 ```python
-from app.cognitive.provider import OllamaProvider
+from app.kernel.provider import OllamaProvider
 
 provider = OllamaProvider(
     host="http://localhost:11434",

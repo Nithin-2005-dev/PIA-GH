@@ -130,15 +130,17 @@ class EvidenceConfidenceEngine:
         ages_in_days = []
         for m in supporting_measurements:
             try:
-                # Handle isoformat correctly, some might end in 'Z'
-                ts_str = m.timestamp.replace("Z", "+00:00")
-                dt = datetime.fromisoformat(ts_str)
+                if isinstance(m.timestamp, str):
+                    ts_str = m.timestamp.replace("Z", "+00:00")
+                    dt = datetime.fromisoformat(ts_str)
+                else:
+                    dt = m.timestamp
                 # Ensure it's timezone aware
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 age = (now - dt).days
                 ages_in_days.append(max(0.0, float(age)))
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError, TypeError):
                 ages_in_days.append(0.0)
 
         average_age = sum(ages_in_days) / len(ages_in_days)

@@ -2,9 +2,9 @@ import pytest
 import os
 import json
 from dataclasses import asdict
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.provider_manager import ProviderManager
-from app.cognitive.models import AgentPolicy, WorkspaceSession, CommunicationMode
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.provider_manager import ProviderManager
+from app.kernel.models import AgentPolicy, WorkspaceSession, CommunicationMode
 from tests.mocks.mock_provider import MockLLMProvider
 from app.platform.api.contracts import RuntimePipelineResult
 from tests.test_platform_adapter import MockRuntimeContext, MockPlatformResult

@@ -4,8 +4,8 @@ import sys
 # Add backend directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.cognitive.provider import GeminiProvider
-from app.cognitive.models import ToolSpecification
+from app.kernel.provider import GeminiProvider
+from app.kernel.models import ToolSpecification
 
 def main():
     print("=====================================================")

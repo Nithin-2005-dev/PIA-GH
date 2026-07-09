@@ -9,8 +9,8 @@ Here is a complete, runnable example of executing the deterministic pipeline and
 ```python
 import os
 from app.platform.runtime import PlatformRuntime
-from app.cognitive.runtime import CognitiveRuntime
-from app.cognitive.provider import OpenAIProvider
+from app.kernel.runtime import CognitiveRuntime
+from app.kernel.provider import OpenAIProvider
 
 # 1. Run deterministic pipeline (The Source of Truth)
 platform = PlatformRuntime.create()

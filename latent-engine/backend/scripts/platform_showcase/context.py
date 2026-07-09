@@ -115,7 +115,9 @@ class BusFactorEntry:
     category: str
     bus_factor: int
     coverage: float
-    risk_level: str            # HIGH / MEDIUM / LOW
+    contributors: int
+    ownership_concentration: float
+    confidence: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +254,7 @@ class PlatformContext:
     simulation_context: SimulationContext | None = None
     org_intelligence: OrgIntelligenceResult | None = None
     causal_context: CausalContextSummary | None = None
+    reasoning_graph: Any | None = None
     reasoning_results: list[ReasoningResult] = field(default_factory=list)
     decisions: list[Decision] = field(default_factory=list)
 

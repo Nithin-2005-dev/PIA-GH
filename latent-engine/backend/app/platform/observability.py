@@ -65,6 +65,38 @@ class StructuredLogger:
             )
         )
 
+    def info(
+        self,
+        message: str,
+        context: TraceContext | None = None,
+        **fields,
+    ) -> None:
+        self.log("INFO", message, context, **fields)
+
+    def warning(
+        self,
+        message: str,
+        context: TraceContext | None = None,
+        **fields,
+    ) -> None:
+        self.log("WARNING", message, context, **fields)
+
+    def error(
+        self,
+        message: str,
+        context: TraceContext | None = None,
+        **fields,
+    ) -> None:
+        self.log("ERROR", message, context, **fields)
+
+    def debug(
+        self,
+        message: str,
+        context: TraceContext | None = None,
+        **fields,
+    ) -> None:
+        self.log("DEBUG", message, context, **fields)
+
     def records(
         self,
     ) -> tuple[LogRecord, ...]:

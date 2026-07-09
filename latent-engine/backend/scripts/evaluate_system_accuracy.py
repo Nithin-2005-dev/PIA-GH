@@ -8,10 +8,10 @@ from types import SimpleNamespace as NS
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.cognitive.models import AgentPolicy, ExecutionStatus, Intent, WorkspaceSession
-from app.cognitive.provider import OllamaProvider
-from app.cognitive.provider_manager import ProviderManager
-from app.cognitive.runtime import CognitiveRuntime
+from app.kernel.models import AgentPolicy, ExecutionStatus, Intent, WorkspaceSession
+from app.kernel.provider import OllamaProvider
+from app.kernel.provider_manager import ProviderManager
+from app.kernel.runtime import CognitiveRuntime
 from app.platform.runtime import PlatformRuntime
 from tests.mocks.mock_provider import MockLLMProvider
 

@@ -1,5 +1,5 @@
 import pytest
-from app.cognitive.adapter import PlatformResultAdapter, MissingMeasurementException, PlatformCompatibilityException
+from app.kernel.adapter import PlatformResultAdapter, MissingMeasurementException, PlatformCompatibilityException
 
 class MockRuntimeContext:
     def __init__(self, missing=False):

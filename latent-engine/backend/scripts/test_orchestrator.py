@@ -1,18 +1,18 @@
 import uuid
 import sys
-from app.cognitive.models import CognitiveGoal, IntentClassification, Intent, ExecutionState, WorkspaceSession, AgentPolicy, PromptContext
-from app.cognitive.registry import CapabilityRegistry
-from app.cognitive.orchestrator import AgentOrchestrator
-from app.cognitive.semantic_parser import SemanticQueryParser
-from app.cognitive.retriever import CapabilityRetriever
-from app.cognitive.planner import PlanningEngine
-from app.cognitive.executor import CapabilityPlanner, Executor
-from app.cognitive.reflection import ReflectionEngine
-from app.cognitive.policy import PolicyEngine
-from app.cognitive.answer_builder import AnswerBuilder
-from app.cognitive.synthesizer import AdaptiveSynthesizer
-from app.cognitive.entity_resolver import EntityResolver
-from app.cognitive.provider import LLMProvider, LLMResponse
+from app.kernel.models import CognitiveGoal, IntentClassification, Intent, ExecutionState, WorkspaceSession, AgentPolicy, PromptContext
+from app.kernel.registry import CapabilityRegistry
+from app.kernel.orchestrator import AgentOrchestrator
+from app.kernel.semantic_parser import SemanticQueryParser
+from app.kernel.retriever import CapabilityRetriever
+from app.kernel.planner import PlanningEngine
+from app.kernel.executor import CapabilityPlanner, Executor
+from app.kernel.reflection import ReflectionEngine
+from app.kernel.policy import PolicyEngine
+from app.kernel.answer_builder import AnswerBuilder
+from app.kernel.synthesizer import AdaptiveSynthesizer
+from app.kernel.entity_resolver import EntityResolver
+from app.kernel.provider import LLMProvider, LLMResponse
 
 class DummyProvider(LLMProvider):
     def generate(self, prompt, **kwargs):
