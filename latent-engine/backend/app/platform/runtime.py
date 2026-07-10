@@ -95,6 +95,7 @@ class PlatformRuntime:
         github_token: str | None = None,
         tenant_id: str = "default",
         output_directory=None,
+        since_commit: str | None = None,
     ) -> RuntimePipelineResult:
         self.register_default_modules()
         built = self.build()
@@ -109,6 +110,7 @@ class PlatformRuntime:
                     github_token=github_token,
                     tenant_id=tenant_id,
                     output_directory=output_directory,
+                    since_commit=since_commit,
                 )
             )
         finally:

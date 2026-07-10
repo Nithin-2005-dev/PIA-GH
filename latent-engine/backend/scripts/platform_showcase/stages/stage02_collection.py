@@ -37,6 +37,7 @@ class CollectionStage(PipelineStage):
             filters={
                 "per_page": context.commit_limit,
                 "sha": context.branch,
+                "since_sha": context.since_commit,
             },
         )
 

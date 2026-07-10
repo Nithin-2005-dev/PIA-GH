@@ -241,6 +241,7 @@ class PlatformContext:
     github_token: str | None
     tenant_id: str
     output_directory: Path
+    since_commit: str | None = None
 
     # Pipeline layers — populated in order
     observations: list[Any] = field(default_factory=list)

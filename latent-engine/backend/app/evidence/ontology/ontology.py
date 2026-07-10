@@ -142,6 +142,16 @@ class EvidenceOntology:
                     "Compliance",
                     "Evidence about control, policy, and audit posture.",
                 ),
+                (
+                    "developer",
+                    "Developer Intelligence",
+                    "Evidence about developer behavior and impact.",
+                ),
+                (
+                    "ownership",
+                    "Ownership",
+                    "Evidence about code ownership and knowledge distribution.",
+                ),
             )
         )
 

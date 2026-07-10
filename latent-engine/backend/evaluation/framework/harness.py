@@ -87,6 +87,16 @@ class EvaluationHarness:
         if real_platform_result and real_platform_result.errors:
             print(f"PIPELINE ERRORS: {real_platform_result.errors}")
             
+        # [Validation] Run Operational Store Validation
+        from evaluation.framework.validators.store_validator import StoreValidator
+        print("Running Operational Store Validation...")
+        store_passed, store_report = StoreValidator.validate()
+        if not store_passed:
+            print(store_report)
+            print("Store Validation FAILED. Benchmark aborted.")
+            return {"error": "Store Validation Failed"}
+        print("Operational Store Validation Passed.")
+
         mock_platform_result = MockPlatformResult(repository=self.manifest.dataset.repository, commits=self.manifest.dataset.size)
         
         session = self.runtime.create_session()

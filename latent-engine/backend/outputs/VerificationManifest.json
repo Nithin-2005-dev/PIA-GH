@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-07-10T09:17:41.517297Z",
+  "git_commit": "d99fb1266b0af071f5e5bedd40d4f756bc14165f",
+  "python_version": "3.14.5",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "datasets_tested": [
+    "v1"
+  ],
+  "repositories_tested": [
+    "facebook/react",
+    "microsoft/TypeScript",
+    "fastapi/fastapi",
+    "kubernetes/kubernetes",
+    "encode/starlette"
+  ],
+  "generated_artifacts": {
+    "RepositoryValidation.json": {
+      "path": "outputs/RepositoryValidation.json",
+      "sha256": "af281bd2aec6d07ccf3dfd7f21313b2a5df62c907f3f0f0b4a8d425c1c334dc8"
+    },
+    "ArchitectureTraceAudit.md": {
+      "path": "outputs/ArchitectureTraceAudit.md",
+      "sha256": "fc43c510f7ecde1edecfc1f8e221ac49186c22e4c21c90fce169a9bdb7012615"
+    },
+    "RuntimePurityAudit.md": {
+      "path": "outputs/RuntimePurityAudit.md",
+      "sha256": "dd95b940a3d8e1eda1502e615840b8cefeef79114e39b53b483a8af6e8b842b7"
+    },
+    "ProjectionIntegrityAudit.md": {
+      "path": "outputs/ProjectionIntegrityAudit.md",
+      "sha256": "4fe92304e7ada2b99e57d1fd255111930858420ca4f2ce0c6f624aa4cd9c7cdb"
+    },
+    "ApiContract.json": {
+      "path": "outputs/ApiContract.json",
+      "sha256": "7fff152da567b7ed946eb63e250fa0ae3a1dd48116f0fd1450258b0435bc6594"
+    },
+    "DeveloperConsoleAudit.json": {
+      "path": "outputs/DeveloperConsoleAudit.json",
+      "sha256": "f6b3f98d4a26ed2193e1734205a36be68fa33e4ba5faa9d6b61659bcaa8881c4"
+    },
+    "KnowledgeGraphProductionGate.md": {
+      "path": "C:/Users/NITHIN/.gemini/antigravity-ide/brain/19a471b5-76a4-418f-b441-d6fb44f5cc9d/KnowledgeGraphProductionGate.md",
+      "sha256": "96c39ee71b07ea17be125123e31aa713610a472f343cdfb60bdde464e52d30d0"
+    }
+  },
+  "overall_verification_status": "PASS"
+}

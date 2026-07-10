@@ -106,6 +106,9 @@ class EvidenceSynthesisEngine:
                         validated
                     )
                 else:
+                    for r in validated.validation_results:
+                        if r.status.value == "failed":
+                            print(f"[Evidence Rejection] {candidate.name}: {r.name} - {r.errors}")
                     rejected_count += 1
 
         return EvidencePackage(

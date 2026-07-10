@@ -1,0 +1,6 @@
+IncrementalSyncValidationReport
+
+Total Measurements: 38
+Updated/Inserted Measurements in Incremental Sync: 22
+
+PASS: Only 22 measurements were updated, confirming incremental behavior.

@@ -183,9 +183,10 @@ class ObservationPlatformModule(BaseModule):
             ),
             scope=ServiceScope.SINGLETON,
         )
+        from app.observation.ingestion.operational_adapter import OperationalStoreAdapterFactory
         services.add(
             GitHubAdapterFactory,
-            lambda _: GitHubAdapterFactory(),
+            lambda _: OperationalStoreAdapterFactory(),
             scope=ServiceScope.SINGLETON,
         )
 

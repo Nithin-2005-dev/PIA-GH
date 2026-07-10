@@ -38,6 +38,7 @@ class CanonicalPlatformPipeline:
             github_token=request.github_token,
             tenant_id=request.tenant_id,
             output_directory=request.output_directory or Path("outputs/showcase"),
+            since_commit=request.since_commit,
             runtime=self._built.runtime,
             service_provider=self._built.provider,
         )

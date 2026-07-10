@@ -14,6 +14,7 @@ class RuntimePipelineInput:
     github_token: str | None = None
     tenant_id: str = "default"
     output_directory: Path | None = None
+    since_commit: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

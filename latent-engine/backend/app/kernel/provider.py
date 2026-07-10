@@ -21,7 +21,15 @@ class LLMProvider(Protocol):
         ...
 
 
+class MockLLMProvider:
+    def __init__(self, latency_ms: int = 10, token_rate: int = 100):
+        self.latency_ms = latency_ms
+        self.token_rate = token_rate
 
+    def generate(self, prompt: str, tools: Sequence = ()) -> LLMResponse:
+        import time
+        time.sleep(self.latency_ms / 1000.0)
+        return LLMResponse("Mock response from MockLLMProvider")
 
 
 class OpenAIProvider:
