@@ -242,24 +242,84 @@ class ExecutionRecord:
 
 
 # ─────────────────────────────────────────────────────────
-# Reasoning Result
+# Fact Record
 # ─────────────────────────────────────────────────────────
 
 @dataclass
-class ReasoningRecord:
-    """A structured reasoning result with traceable evidence->inference->recommendation chain."""
-    identity: GlobalIdentity = field(default_factory=lambda: GlobalIdentity(object_type="reasoning"))
-    execution_id: str = ""
+class FactRecord:
+    """A deterministic fact synthesized from Evidence and Measurements."""
+    identity: GlobalIdentity = field(default_factory=lambda: GlobalIdentity(object_type="fact"))
     repository_session_id: str = ""
-    reasoning_type: str = ""
-    conclusion: str = ""
+    fact_type: str = ""
     confidence: float = 0.0
-    evidence_chain: List[Dict[str, Any]] = field(default_factory=list)
-    rules_fired: List[str] = field(default_factory=list)
-    alternative_paths: List[str] = field(default_factory=list)
-    business_impact: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    measurement_ids: List[str] = field(default_factory=list)
+    evidence_ids: List[str] = field(default_factory=list)
+    knowledge_node_ids: List[str] = field(default_factory=list)
+    hash: str = ""
+    
+    @property
+    def object_id(self) -> str:
+        return self.identity.object_id
 
+
+# ─────────────────────────────────────────────────────────
+# Rule Evaluation & Execution Records
+# ─────────────────────────────────────────────────────────
+
+@dataclass
+class RuleEvaluationRecord:
+    """Records every rule that was evaluated, including failures."""
+    identity: GlobalIdentity = field(default_factory=lambda: GlobalIdentity(object_type="rule_evaluation"))
+    repository_session_id: str = ""
+    rule_id: str = ""
+    inputs: Dict[str, Any] = field(default_factory=dict)
+    preconditions: Dict[str, Any] = field(default_factory=dict)
+    passed: bool = False
+    reason_if_failed: str = ""
+    latency_ms: float = 0.0
+    
+    @property
+    def object_id(self) -> str:
+        return self.identity.object_id
+
+
+@dataclass
+class RuleExecutionRecord:
+    """Records every rule that fired and produced outputs."""
+    identity: GlobalIdentity = field(default_factory=lambda: GlobalIdentity(object_type="rule_execution"))
+    repository_session_id: str = ""
+    rule_id: str = ""
+    outputs: Dict[str, Any] = field(default_factory=dict)
+    confidence: float = 0.0
+    execution_hash: str = ""
+    
+    @property
+    def object_id(self) -> str:
+        return self.identity.object_id
+
+
+# ─────────────────────────────────────────────────────────
+# Reasoning Graph Projection Record
+# ─────────────────────────────────────────────────────────
+
+@dataclass
+class ReasoningGraphProjectionRecord:
+    """The final deterministic projection output of the Reasoning Builder."""
+    identity: GlobalIdentity = field(default_factory=lambda: GlobalIdentity(object_type="reasoning_projection"))
+    projection_id: str = field(default_factory=_new_id)
+    schema_version: str = "1.0"
+    builder_version: str = "1.0"
+    dataset_id: str = ""
+    execution_id: str = ""
+    nodes: List[Dict[str, Any]] = field(default_factory=list)
+    edges: List[Dict[str, Any]] = field(default_factory=list)
+    measurement_hash: str = ""
+    evidence_hash: str = ""
+    fact_hash: str = ""
+    rule_hash: str = ""
+    inference_hash: str = ""
+    projection_hash: str = ""
+    
     @property
     def object_id(self) -> str:
         return self.identity.object_id
@@ -348,7 +408,10 @@ ALL_RECORD_TYPES = [
     MeasurementRecord,
     EvidenceRecord,
     ExecutionRecord,
-    ReasoningRecord,
+    FactRecord,
+    RuleEvaluationRecord,
+    RuleExecutionRecord,
+    ReasoningGraphProjectionRecord,
     DatasetRecord,
     KnowledgeGraphProjectionRecord,
 ]

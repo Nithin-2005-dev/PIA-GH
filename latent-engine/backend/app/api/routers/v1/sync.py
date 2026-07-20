@@ -5,7 +5,7 @@ Exposes sync control and status to the Developer Console.
 All state is served from the Operational Store and Sync Engine — never computed on the fly.
 """
 from __future__ import annotations
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
@@ -24,21 +24,25 @@ class SyncRequest(BaseModel):
 class JobResponse(BaseModel):
     job_id: str
     repository: str
+    repository_session_id: Optional[str] = None
+    workspace_id: Optional[str] = None
     sync_mode: str
     status: str
-    started_at: str
+    started_at: Optional[str] = None
 
 
 class SyncJobDTO(BaseModel):
     job_id: str
     repository: str
+    repository_session_id: Optional[str] = None
     workspace_id: Optional[str]
     sync_mode: str
     status: str
-    started_at: str
+    started_at: Optional[str] = None
     completed_at: Optional[str]
     error: Optional[str]
-    progress: Dict[str, int]
+    progress: Dict[str, Any]
+    current_operation: Optional[str] = None
 
 
 class CancelResponse(BaseModel):
@@ -64,13 +68,21 @@ def _job_dto(job) -> SyncJobDTO:
     return SyncJobDTO(
         job_id=job.job_id,
         repository=job.repository,
+        repository_session_id=job.repository_session_id or None,
         workspace_id=job.workspace_id,
         sync_mode=job.sync_mode.value,
         status=job.status.value,
         started_at=job.started_at,
         completed_at=job.completed_at,
         error=job.error,
-        progress=job.progress
+        progress={
+            "commits": job.commits_processed,
+            "total": job.commits_total,
+            "developers": job.developers_found,
+            "files": job.files_processed,
+            "objects": job.objects_added,
+        },
+        current_operation=job.current_operation,
     )
 
 
@@ -95,6 +107,8 @@ async def start_sync(request: SyncRequest):
     return JobResponse(
         job_id=job.job_id,
         repository=job.repository,
+        repository_session_id=job.repository_session_id or None,
+        workspace_id=job.workspace_id or None,
         sync_mode=job.sync_mode.value,
         status=job.status.value,
         started_at=job.started_at,
@@ -149,3 +163,43 @@ async def get_rate_limit(github_token: Optional[str] = None):
     plugin = GitHubSourcePlugin(token=github_token)
     r = plugin.get_rate_limit()
     return RateLimitResponse(remaining=r.get("remaining", 0), limit=r.get("limit", 0), reset_at=r.get("reset_at", 0))
+
+
+class WatchToggleRequest(BaseModel):
+    enabled: bool
+
+class WatchToggleResponse(BaseModel):
+    repository_session_id: str
+    watch_mode: bool
+
+@router.post("/watch/{repository_session_id}", response_model=WatchToggleResponse)
+async def toggle_watch_mode(repository_session_id: str, request: WatchToggleRequest, background_tasks: BackgroundTasks):
+    from app.adapters.database.sqlite_provider import get_provider
+    from app.adapters.database.models import RepositorySessionRecord
+    from app.platform.sync_engine import get_sync_engine, SyncMode
+    
+    provider = get_provider()
+    sessions = provider.query(RepositorySessionRecord, limit=100000)
+    session = next((s for s in sessions if s.object_id == repository_session_id), None)
+    
+    if not session:
+        raise HTTPException(404, detail=f"Session {repository_session_id} not found")
+        
+    if session.metadata is None:
+        session.metadata = {}
+    session.metadata["watch_mode"] = request.enabled
+    provider.update(session)
+    
+    if request.enabled:
+        # Immediately trigger an incremental sync in the background so the user gets instant live status feedback
+        engine = get_sync_engine()
+        background_tasks.add_task(
+            engine.sync,
+            repository=session.repository,
+            mode=SyncMode.INCREMENTAL,
+            branch=session.branch,
+            commit_limit=-1,
+            workspace_id=session.workspace_id
+        )
+    
+    return WatchToggleResponse(repository_session_id=repository_session_id, watch_mode=request.enabled)

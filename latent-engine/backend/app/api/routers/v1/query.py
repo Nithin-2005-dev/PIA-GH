@@ -17,8 +17,15 @@ def get_query_service() -> QueryService:
 class QueryRequest(BaseModel):
     query: str
     workspace_id: Optional[str] = None
+    repository: Optional[str] = None
+    repository_session_id: Optional[str] = None
 
 @router.post("", response_model=ExecutionTraceDTO_v1)
 async def execute_query(request: QueryRequest, service: QueryService = Depends(get_query_service)):
     # In a real async environment, we might run this in a threadpool
-    return service.execute_query(request.query, workspace_id=request.workspace_id)
+    return service.execute_query(
+        request.query,
+        workspace_id=request.workspace_id,
+        repository=request.repository,
+        repository_session_id=request.repository_session_id,
+    )

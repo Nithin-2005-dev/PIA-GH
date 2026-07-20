@@ -34,6 +34,10 @@ import asyncio
 import datetime
 import time
 import uuid
+import os
+import subprocess
+import threading
+import shutil
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
@@ -126,11 +130,13 @@ class SourcePlugin:
     def fetch_repository_metadata(self, repository: str) -> Dict[str, Any]:
         raise NotImplementedError
 
-    def fetch_commits(self, repository: str, branch: str,
-                      limit: int = 100, since_sha: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def fetch_commits(self, repository: str, branch: str,
+                      limit: int = 100, since_sha: Optional[str] = None,
+                      progress_callback: Optional[Callable[[str], Any]] = None) -> List[Dict[str, Any]]:
         raise NotImplementedError
 
-    def fetch_file_tree(self, repository: str, commit_sha: str) -> List[Dict[str, Any]]:
+    async def fetch_file_tree(self, repository: str, commit_sha: str,
+                              progress_callback: Optional[Callable[[str], Any]] = None) -> List[Dict[str, Any]]:
         raise NotImplementedError
 
     def get_rate_limit(self) -> Dict[str, int]:
@@ -156,6 +162,10 @@ class GitHubSourcePlugin(SourcePlugin):
             self._headers["Authorization"] = f"token {token}"
         self._headers["Accept"] = "application/vnd.github+json"
         self._headers["X-GitHub-Api-Version"] = "2022-11-28"
+        
+        # Local cache path for bare repositories
+        self._repos_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "repos"))
+        os.makedirs(self._repos_dir, exist_ok=True)
 
     def _get(self, url: str, params: Optional[Dict] = None) -> Any:
         import urllib.request
@@ -164,8 +174,13 @@ class GitHubSourcePlugin(SourcePlugin):
         if params:
             url = url + "?" + urllib.parse.urlencode(params)
         req = urllib.request.Request(url, headers=self._headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return _json.loads(resp.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return _json.loads(resp.read().decode())
+        except urllib.error.HTTPError as e:
+            if e.code == 403:
+                raise Exception("GitHub API rate limit exceeded") from e
+            raise
 
     def fetch_repository_metadata(self, repository: str) -> Dict[str, Any]:
         try:
@@ -187,57 +202,206 @@ class GitHubSourcePlugin(SourcePlugin):
         except Exception as e:
             return {"full_name": repository, "error": str(e)}
 
-    def fetch_commits(self, repository: str, branch: str,
-                      limit: int = 100, since_sha: Optional[str] = None) -> List[Dict[str, Any]]:
-        per_page = min(limit, 100)
-        params: Dict[str, Any] = {"sha": branch, "per_page": per_page}
-        commits = []
-        page = 1
-        while len(commits) < limit:
-            params["page"] = page
-            try:
-                batch = self._get(f"https://api.github.com/repos/{repository}/commits", params)
-            except Exception:
-                break
-            if not batch:
-                break
-            for c in batch:
-                if since_sha and c.get("sha") == since_sha:
-                    return commits  # stop at last known commit
-                commits.append({
-                    "sha": c.get("sha", ""),
-                    "message": (c.get("commit", {}).get("message", "") or "")[:500],
-                    "author_email": (c.get("commit", {}).get("author", {}) or {}).get("email", ""),
-                    "author_name": (c.get("commit", {}).get("author", {}) or {}).get("name", ""),
-                    "timestamp": (c.get("commit", {}).get("author", {}) or {}).get("date", ""),
-                    "additions": (c.get("stats", {}) or {}).get("additions", 0),
-                    "deletions": (c.get("stats", {}) or {}).get("deletions", 0),
-                })
-            if len(batch) < per_page:
-                break
-            page += 1
-        return commits[:limit]
+    _repo_locks: Dict[str, asyncio.Lock] = {}
+    _locks_lock = threading.Lock()
 
-    def fetch_file_tree(self, repository: str, commit_sha: str) -> List[Dict[str, Any]]:
+    def _get_repo_lock(self, repository: str) -> asyncio.Lock:
+        with self._locks_lock:
+            if repository not in self._repo_locks:
+                self._repo_locks[repository] = asyncio.Lock()
+            return self._repo_locks[repository]
+
+    async def _ensure_cloned(self, repository: str, progress_callback: Optional[Callable[[str], Any]] = None) -> str:
+        safe_name = repository.replace("/", "_") + ".git"
+        repo_path = os.path.join(self._repos_dir, safe_name)
+        
+        lock = self._get_repo_lock(repository)
+        async with lock:
+            if os.path.exists(repo_path) and not os.path.exists(os.path.join(repo_path, "HEAD")):
+                # Corrupted or incomplete clone, remove it
+                shutil.rmtree(repo_path, ignore_errors=True)
+
+            loop = asyncio.get_running_loop()
+
+            def _run_git(git_cmd):
+                process = subprocess.Popen(
+                    git_cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=False
+                )
+                
+                import concurrent.futures
+                futs = []
+                
+                # Read stderr byte by byte to handle \r without buffering
+                if process.stderr:
+                    buf = bytearray()
+                    while True:
+                        b = process.stderr.read(1)
+                        if not b:
+                            if buf and progress_callback:
+                                line_str = buf.decode('utf-8', errors='replace').strip()
+                                if line_str:
+                                    if asyncio.iscoroutinefunction(progress_callback):
+                                        fut = asyncio.run_coroutine_threadsafe(progress_callback(line_str), loop)
+                                        futs.append(fut)
+                                    else:
+                                        progress_callback(line_str)
+                            break
+                        
+                        if b in (b'\n', b'\r'):
+                            if buf and progress_callback:
+                                line_str = buf.decode('utf-8', errors='replace').strip()
+                                if line_str:
+                                    if asyncio.iscoroutinefunction(progress_callback):
+                                        fut = asyncio.run_coroutine_threadsafe(progress_callback(line_str), loop)
+                                        futs.append(fut)
+                                    else:
+                                        progress_callback(line_str)
+                            buf.clear()
+                        else:
+                            buf.extend(b)
+                
+                process.wait()
+                if futs:
+                    concurrent.futures.wait(futs)
+                    
+                if process.returncode != 0:
+                    raise Exception(f"Git command failed: {' '.join(git_cmd)}")
+
+            if os.path.exists(repo_path):
+                # Fetch updates
+                if progress_callback:
+                    if asyncio.iscoroutinefunction(progress_callback):
+                        asyncio.run_coroutine_threadsafe(progress_callback("Connecting to GitHub... (fetching updates)"), loop)
+                    else:
+                        progress_callback("Connecting to GitHub... (fetching updates)")
+                try:
+                    await asyncio.to_thread(_run_git, ["git", f"--git-dir={repo_path}", "fetch", "origin", "+refs/heads/*:refs/heads/*", "--progress"])
+                except Exception as e:
+                    import logging
+                    logging.warning(f"Git fetch failed, corrupted repo? Deleting and re-cloning: {e}")
+                    import stat
+                    def remove_readonly(func, path, excinfo):
+                        os.chmod(path, stat.S_IWRITE)
+                        func(path)
+                    shutil.rmtree(repo_path, onerror=remove_readonly)
+                    
+            if not os.path.exists(repo_path):
+                # Clone bare repository
+                if progress_callback:
+                    if asyncio.iscoroutinefunction(progress_callback):
+                        asyncio.run_coroutine_threadsafe(progress_callback("Connecting to GitHub... (cloning repository)"), loop)
+                    else:
+                        progress_callback("Connecting to GitHub... (cloning repository)")
+                url = f"https://github.com/{repository}.git"
+                await asyncio.to_thread(_run_git, ["git", "clone", "--bare", "--progress", url, repo_path])
+                
+        return repo_path
+
+    async def fetch_commits(self, repository: str, branch: str,
+                      limit: int = 100, since_sha: Optional[str] = None,
+                      progress_callback: Optional[Callable[[str], Any]] = None) -> List[Dict[str, Any]]:
+        repo_path = await self._ensure_cloned(repository, progress_callback=progress_callback)
+        
+        # Build git log command
+        cmd = ["git", f"--git-dir={repo_path}", "log", "--numstat", "--pretty=format:COMMIT|%H|%an|%ae|%aI|%s"]
+        
+        if limit > 0:
+            cmd.extend(["-n", str(limit)])
+            
+        if since_sha:
+            cmd.append(f"{since_sha}..{branch}")
+        else:
+            cmd.append(branch)
+            
         try:
-            data = self._get(
-                f"https://api.github.com/repos/{repository}/git/trees/{commit_sha}",
-                {"recursive": "1"}
-            )
-            files = []
-            for item in data.get("tree", []):
-                if item.get("type") == "blob":
-                    path = item.get("path", "")
-                    ext = path.rsplit(".", 1)[-1] if "." in path else ""
-                    files.append({
-                        "path": path,
-                        "size": item.get("size", 0),
-                        "sha": item.get("sha", ""),
-                        "extension": ext,
-                    })
-            return files
-        except Exception:
+            # We still use subprocess.run for this fast operation, but in a thread to not block event loop
+            result = await asyncio.to_thread(subprocess.run, cmd, check=True, capture_output=True, text=True, encoding="utf-8")
+        except subprocess.CalledProcessError as e:
+            print(f"Git log failed: {e.stderr}")
             return []
+            
+        commits = []
+        current_commit = None
+        
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+                
+            if line.startswith("COMMIT|"):
+                parts = line.split("|", 5)
+                if len(parts) == 6:
+                    current_commit = {
+                        "sha": parts[1],
+                        "author_name": parts[2],
+                        "author_email": parts[3],
+                        "timestamp": parts[4],
+                        "message": parts[5][:500],
+                        "additions": 0,
+                        "deletions": 0,
+                    }
+                    commits.append(current_commit)
+            elif current_commit is not None:
+                # numstat line: added deleted filename
+                stat_parts = line.split("\t", 2)
+                if len(stat_parts) == 3:
+                    try:
+                        adds = int(stat_parts[0]) if stat_parts[0] != "-" else 0
+                        dels = int(stat_parts[1]) if stat_parts[1] != "-" else 0
+                        current_commit["additions"] += adds
+                        current_commit["deletions"] += dels
+                    except ValueError:
+                        pass
+                        
+        return commits
+
+    async def fetch_file_tree(self, repository: str, commit_sha: str,
+                              progress_callback: Optional[Callable[[str], Any]] = None) -> List[Dict[str, Any]]:
+        repo_path = await self._ensure_cloned(repository, progress_callback=progress_callback)
+        
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                ["git", f"--git-dir={repo_path}", "ls-tree", "-r", "-l", commit_sha], 
+                check=True, capture_output=True, text=True, encoding="utf-8"
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Git ls-tree failed: {e.stderr}")
+            return []
+            
+        files = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Format: mode type sha size    path
+            parts = line.split()
+            if len(parts) >= 5 and parts[1] == "blob":
+                sha = parts[2]
+                size_str = parts[3]
+                # the rest is the path, which might contain spaces
+                path = line.split("\t", 1)[1]
+                
+                size = 0
+                if size_str != "-":
+                    try:
+                        size = int(size_str)
+                    except ValueError:
+                        pass
+                        
+                ext = path.rsplit(".", 1)[-1] if "." in path else ""
+                files.append({
+                    "path": path,
+                    "size": size,
+                    "sha": sha,
+                    "extension": ext,
+                })
+                
+        return files
 
     def get_rate_limit(self) -> Dict[str, int]:
         try:
@@ -288,6 +452,7 @@ class SyncEngine:
         workspace_id: Optional[str] = None,
     ) -> SyncJob:
         """Start a sync job. Returns immediately; call get_job_status() for progress."""
+        repository = _normalize_repository(repository)
         job = SyncJob(
             repository=repository,
             sync_mode=mode,
@@ -311,7 +476,10 @@ class SyncEngine:
         return self._active_jobs.get(job_id)
 
     def get_active_jobs(self) -> List[SyncJob]:
-        return [j for j in self._active_jobs.values() if j.status == SyncStatus.RUNNING]
+        return [
+            j for j in self._active_jobs.values()
+            if j.status in {SyncStatus.PENDING, SyncStatus.RUNNING, SyncStatus.PAUSED}
+        ]
 
     def get_history(self, limit: int = 20) -> List[SyncJob]:
         return self._history[-limit:][::-1]
@@ -342,8 +510,11 @@ class SyncEngine:
             "schema_version": "v1",
             "event_type": "sync.started",
             "occurred_at": job.started_at,
+            "job_id": job.job_id,
             "repository": job.repository,
+            "branch": job.branch,
             "sync_mode": job.sync_mode.value,
+            "status": job.status.value,
             "source_plugin": "github",
         })
 
@@ -353,8 +524,10 @@ class SyncEngine:
             else:
                 await self._ingest_repository(job, plugin)
         except Exception as e:
+            import traceback
             job.status = SyncStatus.FAILED
-            job.error = str(e)
+            job.error = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+            logger.exception(f"Sync failed for {job.repository}")
             self._event_store.append(StoreEvent(
                 event_type=EventType.SYNC_FAILED.value,
                 source_component="sync_engine",
@@ -364,7 +537,11 @@ class SyncEngine:
                 "schema_version": "v1",
                 "event_type": "sync.failed",
                 "occurred_at": datetime.datetime.utcnow().isoformat() + "Z",
+                "job_id": job.job_id,
                 "repository": job.repository,
+                "branch": job.branch,
+                "repository_session_id": job.repository_session_id,
+                "status": job.status.value,
                 "error": str(e),
             })
         finally:
@@ -384,13 +561,14 @@ class SyncEngine:
         4. File tree → Operational Store
         5. Trigger projection engine for every batch
         """
-        repo = job.repository
+        repo = _normalize_repository(job.repository)
+        job.repository = repo
 
         # ── 1. Repository / Session ──────────────────────────
         job.current_operation = "Fetching repository metadata"
         await self._emit_progress(job)
 
-        meta = plugin.fetch_repository_metadata(repo)
+        meta = await asyncio.to_thread(plugin.fetch_repository_metadata, repo)
 
         # Find or create workspace
         workspaces = self._provider.query(WorkspaceRecord, limit=1)
@@ -402,29 +580,38 @@ class SyncEngine:
             workspace_id = ws.object_id
         job.workspace_id = workspace_id
 
-        # Find or create repository session
-        existing_sessions = self._provider.query(RepositorySessionRecord, limit=50)
+        # Find or create repository session (use high limit to ensure we don't miss existing ones and create duplicates)
+        existing_sessions = self._provider.query(RepositorySessionRecord, limit=100000)
         session = next(
-            (s for s in existing_sessions if s.repository == repo and s.branch == job.branch),
+            (
+                s for s in existing_sessions
+                if _normalize_repository(s.repository) == repo and (s.branch or "main") == job.branch
+            ),
             None
         )
 
-        if session is None or job.sync_mode == SyncMode.FULL:
+        if session is None:
             session = RepositorySessionRecord(
                 identity=GlobalIdentity(
-                    object_type="repositorysession",
+                    object_type="repository_session",
                     workspace_id=workspace_id,
                 ),
                 workspace_id=workspace_id,
                 repository=repo,
                 branch=job.branch,
+                commit_window=job.commit_limit,
                 sync_status="syncing",
                 source_plugin=plugin.source_id,
                 metadata=meta,
             )
             self._provider.insert(session)
         else:
+            session.repository = repo
+            session.branch = job.branch
+            session.commit_window = job.commit_limit
             session.sync_status = "syncing"
+            session.source_plugin = plugin.source_id
+            session.metadata = {**(session.metadata or {}), **meta}
             self._provider.update(session)
 
         job.repository_session_id = session.object_id
@@ -434,8 +621,12 @@ class SyncEngine:
         job.current_operation = "Fetching commits"
         await self._emit_progress(job)
 
-        commits_raw = plugin.fetch_commits(
-            repo, job.branch, limit=job.commit_limit, since_sha=since_sha
+        async def _progress(msg: str):
+            job.current_operation = msg
+            await self._emit_progress(job)
+
+        commits_raw = await plugin.fetch_commits(
+            repo, job.branch, job.commit_limit, since_sha, progress_callback=_progress
         )
         job.commits_total = len(commits_raw)
         job.api_calls_made += 1
@@ -532,7 +723,7 @@ class SyncEngine:
             await self._emit_progress(job)
             head_sha = commits_raw[0]["sha"]
 
-            files_raw = plugin.fetch_file_tree(repo, head_sha)
+            files_raw = await plugin.fetch_file_tree(repo, head_sha, progress_callback=_progress)
             job.api_calls_made += 1
 
             for raw_file in files_raw:
@@ -662,7 +853,11 @@ class SyncEngine:
             "schema_version": "v1",
             "event_type": "sync.completed",
             "occurred_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "job_id": job.job_id,
             "repository": repo,
+            "branch": job.branch,
+            "repository_session_id": session.object_id,
+            "status": SyncStatus.COMPLETED.value,
             "commits_ingested": job.commits_processed,
             "developers_ingested": job.developers_found,
             "files_ingested": job.files_processed,
@@ -685,7 +880,11 @@ class SyncEngine:
             "schema_version": "v1",
             "event_type": "sync.progress",
             "occurred_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "job_id": job.job_id,
             "repository": job.repository,
+            "branch": job.branch,
+            "repository_session_id": job.repository_session_id,
+            "status": job.status.value,
             "commits_processed": job.commits_processed,
             "commits_total": job.commits_total,
             "developers_found": job.developers_found,
@@ -711,6 +910,10 @@ _EXT_TO_LANGUAGE: Dict[str, str] = {
 }
 
 
+def _normalize_repository(repository: str) -> str:
+    return (repository or "").strip().strip("/").lower()
+
+
 # ─────────────────────────────────────────────────────────
 # Module-level singleton
 # ─────────────────────────────────────────────────────────
@@ -724,6 +927,14 @@ def get_sync_engine(broadcaster: Any = None) -> SyncEngine:
         from app.adapters.database.sqlite_provider import get_provider
         from app.platform.events.store import get_event_store
         from app.platform.projections.engine import get_projection_engine
+        
+        if broadcaster is None:
+            try:
+                from app.api.routers.ws import SyncBroadcaster
+                broadcaster = SyncBroadcaster()
+            except ImportError:
+                pass
+
         _engine = SyncEngine(
             provider=get_provider(),
             event_store=get_event_store(),

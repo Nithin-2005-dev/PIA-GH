@@ -21,14 +21,24 @@ class ConnectionManager:
 
     async def handle_broker_event(self, event: BaseEvent):
         message = event.model_dump_json()
+        await self.broadcast_raw_str(message)
+
+    async def broadcast_raw_str(self, message: str):
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
             except Exception:
-                # Connection might have dropped mid-send
                 pass
 
+    async def broadcast(self, event_dict: dict):
+        message = json.dumps(event_dict)
+        await self.broadcast_raw_str(message)
+
 manager = ConnectionManager()
+
+class SyncBroadcaster:
+    async def broadcast(self, event: dict):
+        await manager.broadcast(event)
 
 @router.websocket("/ws/v1/runtime")
 async def websocket_endpoint(websocket: WebSocket):

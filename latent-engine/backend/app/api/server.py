@@ -40,6 +40,7 @@ async def startup_event():
     from app.adapters.database.sqlite_provider import get_provider
     from app.platform.events.store import get_event_store
     from app.platform.events.store import StoreEvent, EventType
+    from app.platform.sync_watcher import get_sync_watcher
     get_provider()  # initializes tables
     event_store = get_event_store()  # initializes event log
     event_store.append(StoreEvent(
@@ -47,6 +48,16 @@ async def startup_event():
         source_component="server",
         payload={"version": "2.0.0"},
     ))
+    
+    # Start the continuous sync watcher
+    watcher = get_sync_watcher()
+    watcher.start(interval_seconds=30)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    from app.platform.sync_watcher import get_sync_watcher
+    watcher = get_sync_watcher()
+    await watcher.stop()
 
 
 # ─────────────────────────────────────────────────────────

@@ -10,8 +10,8 @@ async def get_latest_graph():
     builder = KnowledgeGraphProjectionBuilder()
     graph = builder.build_projection()
     
-    dto_nodes = [GraphNodeDTO_v1(id=n.id, type=n.type, attributes=n.attributes or {}) for n in graph.nodes]
-    dto_edges = [GraphEdgeDTO_v1(source=e.source_id, target=e.target_id, type=e.relationship, provenance=e.provenance.evidence_id if e.provenance else "") for e in graph.edges]
+    dto_nodes = [GraphNodeDTO_v1(id=n["id"], type=n["type"], attributes=n.get("attributes", {})) for n in graph.nodes]
+    dto_edges = [GraphEdgeDTO_v1(source=e["source"], target=e["target"], type=e["type"], provenance=e.get("provenance", "")) for e in graph.edges]
     
     return GraphResponseDTO_v1(nodes=dto_nodes, edges=dto_edges, total_nodes=len(graph.nodes), truncated=False)
 
@@ -21,8 +21,8 @@ async def get_version_graph(version_id: str):
     builder = KnowledgeGraphProjectionBuilder()
     graph = builder.build_projection()
     
-    dto_nodes = [GraphNodeDTO_v1(id=n.id, type=n.type, attributes=n.attributes or {}) for n in graph.nodes]
-    dto_edges = [GraphEdgeDTO_v1(source=e.source_id, target=e.target_id, type=e.relationship, provenance=e.provenance.evidence_id if e.provenance else "") for e in graph.edges]
+    dto_nodes = [GraphNodeDTO_v1(id=n["id"], type=n["type"], attributes=n.get("attributes", {})) for n in graph.nodes]
+    dto_edges = [GraphEdgeDTO_v1(source=e["source"], target=e["target"], type=e["type"], provenance=e.get("provenance", "")) for e in graph.edges]
     
     return GraphResponseDTO_v1(nodes=dto_nodes, edges=dto_edges, total_nodes=len(graph.nodes), truncated=False)
 

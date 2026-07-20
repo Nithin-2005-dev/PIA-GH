@@ -290,13 +290,13 @@ class CausalRuleRegistry:
 
 
 def default_rule_registry() -> CausalRuleRegistry:
-    """Builds the default registry with all five built-in providers."""
+    """Builds the default registry with built-in providers."""
     registry = CausalRuleRegistry()
-    registry.register(DocumentationRuleProvider())
-    registry.register(OwnershipRuleProvider())
-    registry.register(ReviewRuleProvider())
-    registry.register(ExpertiseRuleProvider())
-    registry.register(VelocityRuleProvider())
+    # registry.register(DocumentationRuleProvider()) # RETIRED
+    # registry.register(OwnershipRuleProvider()) # RETIRED
+    # registry.register(ReviewRuleProvider()) # RETIRED
+    # registry.register(ExpertiseRuleProvider()) # RETIRED
+    # registry.register(VelocityRuleProvider()) # RETIRED
     return registry
 
 

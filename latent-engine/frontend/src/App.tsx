@@ -1,117 +1,180 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWorkspaceStore } from './store/workspaceStore';
-import { Database, Layers, Settings, Search, Network, BarChart3, Activity, Clock, Info } from 'lucide-react';
-import QueryPlayground from './features/query/QueryPlayground';
-import InteractiveGraph from './features/graph/InteractiveGraph';
-import TraceTimeline from './features/query/TraceTimeline';
-import ExplainabilityView from './features/query/ExplainabilityView';
-import RuntimeInspector from './features/runtime/RuntimeInspector';
-import BenchmarkCenter from './features/benchmark/BenchmarkCenter';
-import ProjectionHealthConsole from './features/runtime/ProjectionHealthConsole';
-import ObjectInspectorView from './features/runtime/ObjectInspectorView';
+import { Layers, Search, Database, Bot, Menu } from 'lucide-react';
+import Sidebar from './components/Sidebar';
+import CommandPalette from './components/CommandPalette';
+import ChatAgentSidebar from './components/ChatAgentSidebar';
+import { useLiveTelemetry } from './api/useLiveTelemetry';
 
-// Basic Plugin Registry Architecture
-const PLUGINS = [
-  { id: 'inspector', label: 'Object Inspector', icon: <Search size={16}/>, component: <ObjectInspectorView /> },
-  { id: 'graph', label: 'Interactive Graph', icon: <Network size={16}/>, component: <InteractiveGraph /> },
-  { id: 'benchmark', label: 'Benchmark Center', icon: <BarChart3 size={16}/>, component: <BenchmarkCenter /> }
-];
+// Pages
+import RepositoriesPage from './pages/RepositoriesPage';
+import ExecutionsPage from './pages/ExecutionsPage';
+import ObjectsPage from './pages/ObjectsPage';
+import MeasurementsPage from './pages/MeasurementsPage';
+import EvidencePage from './pages/EvidencePage';
+import KnowledgeGraphPage from './pages/KnowledgeGraphPage';
+import ReasoningGraphPage from './pages/ReasoningGraphPage';
+import SimulationPage from './pages/SimulationPage';
+import DecisionsPage from './pages/DecisionsPage';
+import BenchmarksPage from './pages/BenchmarksPage';
+import ValidationPage from './pages/ValidationPage';
+import ReplayPage from './pages/ReplayPage';
+import AlgorithmsPage from './pages/AlgorithmsPage';
+import RulesPage from './pages/RulesPage';
+import DatasetsPage from './pages/DatasetsPage';
+import RuntimePage from './pages/RuntimePage';
+import SettingsPage from './pages/SettingsPage';
+
+const PAGE_MAP: Record<string, React.ReactNode> = {
+  'repositories': <RepositoriesPage />,
+  'executions': <ExecutionsPage />,
+  'objects': <ObjectsPage />,
+  'measurements': <MeasurementsPage />,
+  'evidence': <EvidencePage />,
+  'knowledge-graph': <KnowledgeGraphPage />,
+  'reasoning-graph': <ReasoningGraphPage />,
+  'simulation': <SimulationPage />,
+  'decisions': <DecisionsPage />,
+  'benchmarks': <BenchmarksPage />,
+  'validation': <ValidationPage />,
+  'replay': <ReplayPage />,
+  'algorithms': <AlgorithmsPage />,
+  'rules': <RulesPage />,
+  'datasets': <DatasetsPage />,
+  'runtime': <RuntimePage />,
+  'settings': <SettingsPage />,
+};
 
 function App() {
-  const { workspace, updateWorkspace } = useWorkspaceStore();
-  const [activeTab, setActiveTab] = useState(PLUGINS[0].id);
+  useLiveTelemetry();
+  const { workspace } = useWorkspaceStore();
+  const [activePage, setActivePage] = useState('repositories');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
+  
+  // Chat Agent State
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatExpanded, setChatExpanded] = useState(false);
 
-  const activePlugin = PLUGINS.find(p => p.id === activeTab);
+  // Global Ctrl+K handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCmdPaletteOpen(prev => !prev);
+      }
+      if (e.key === 'Escape') {
+        setCmdPaletteOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)');
+    const syncViewport = () => setIsMobileViewport(media.matches);
+    syncViewport();
+    media.addEventListener('change', syncViewport);
+    return () => media.removeEventListener('change', syncViewport);
+  }, []);
+
+  const navigate = (pageId: string) => {
+    setActivePage(pageId);
+    setMobileSidebarOpen(false);
+  };
 
   return (
-    <div className="ide-container">
-      {/* HEADER */}
-      <header className="ide-header glass-panel">
-        <div className="flex items-center gap-4">
-          <Layers size={24} className="text-accent-blue" />
-          <h2>PIA Developer Console</h2>
-        </div>
-        
-        {/* Repository Workspace First-Class Object */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted bg-black bg-opacity-20 p-2 rounded">
-            <Database size={16} />
-            <select 
-              value={workspace.repository} 
-              onChange={e => updateWorkspace({ repository: e.target.value })}
-              className="bg-transparent border-none font-bold"
+    <>
+      <div className={`ide-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
+        {/* Header */}
+        <header className="ide-header">
+          <div className="ide-header__brand">
+            <button
+              type="button"
+              className="mobile-nav-toggle"
+              onClick={() => setMobileSidebarOpen(prev => !prev)}
+              aria-label="Toggle navigation"
             >
-              <option value="facebook/react">facebook/react</option>
-              <option value="expressjs/express">expressjs/express</option>
-            </select>
-            <span className="opacity-50">/</span>
-            <select 
-              value={workspace.dataset} 
-              onChange={e => updateWorkspace({ dataset: e.target.value })}
-              className="bg-transparent border-none"
-            >
-              <option value="v1">v1</option>
-              <option value="v2">v2</option>
-            </select>
-            <span className="opacity-50">/</span>
-            <span className="font-mono">{workspace.branch}</span>
-            <span className="ml-2 text-xs text-accent-green border border-accent-green px-1 rounded bg-accent-green bg-opacity-10">
-              Win: {workspace.commitWindow}
-            </span>
-          </div>
-          <button className="flex items-center gap-2"><Settings size={16} /> Config</button>
-        </div>
-      </header>
-
-      {/* LEFT SIDEBAR: Pipeline & Query Playground */}
-      <aside className="ide-sidebar-left glass-panel p-4 flex-col">
-        <h3 className="flex items-center gap-2 mb-4"><Search size={18}/> Query Playground</h3>
-        <QueryPlayground />
-      </aside>
-
-      {/* MAIN CONTENT: Plugin View */}
-      <main className="ide-main glass-panel p-4 flex flex-col">
-        <div className="flex items-center gap-4 mb-4 border-b pb-2" style={{ borderBottomColor: 'var(--panel-border)' }}>
-          {PLUGINS.map(plugin => (
-            <button 
-              key={plugin.id}
-              style={{ 
-                background: activeTab === plugin.id ? 'var(--accent-blue)' : 'transparent', 
-                color: activeTab === plugin.id ? 'white' : 'var(--text-muted)' 
-              }}
-              onClick={() => setActiveTab(plugin.id)}
-              className="flex items-center gap-2"
-            >
-              {plugin.icon} {plugin.label}
+              <Menu size={18} />
             </button>
-          ))}
+            <Layers size={20} />
+            <span>PIA</span>
+          </div>
+
+          <div className="ide-header__center">
+            <div className="cmd-trigger" onClick={() => setCmdPaletteOpen(true)}>
+              <Search size={14} />
+              <span>Search everything...</span>
+              <kbd>Ctrl K</kbd>
+            </div>
+          </div>
+
+          <div className="ide-header__actions">
+            <div className="workspace-badge">
+              <div className="workspace-badge__dot" />
+              <Database size={12} />
+              <span>{workspace.repository}</span>
+              <span style={{ opacity: 0.4 }}>/</span>
+              <span>{workspace.branch}</span>
+            </div>
+            
+            {/* Copilot Toggle */}
+            <button 
+              onClick={() => setChatOpen(!chatOpen)}
+              className={`flex items-center justify-center p-2 rounded-md transition-colors ${chatOpen ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'}`}
+              title="Toggle Copilot"
+            >
+              <Bot size={16} />
+            </button>
+          </div>
+        </header>
+
+        {/* Sidebar */}
+          <Sidebar
+            activePage={activePage}
+            onNavigate={navigate}
+            collapsed={isMobileViewport ? false : sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(prev => !prev)}
+          />
+        {mobileSidebarOpen && (
+          <button
+            type="button"
+            className="mobile-sidebar-backdrop"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-label="Close navigation"
+          />
+        )}
+
+        {/* Main Content & Chat */}
+        <div className="app-workspace flex flex-1 overflow-hidden">
+          <main className="ide-main flex-1">
+            {PAGE_MAP[activePage] || (
+              <div className="empty-state" style={{ height: '100%' }}>
+                <div className="empty-state__title">Page not found</div>
+              </div>
+            )}
+          </main>
+          
+          {chatOpen && (
+            <ChatAgentSidebar 
+              onClose={() => setChatOpen(false)}
+              isExpanded={chatExpanded}
+              setIsExpanded={setChatExpanded}
+            />
+          )}
         </div>
-        <div className="flex-1" style={{ position: 'relative' }}>
-           {activePlugin?.component}
-        </div>
-      </main>
+      </div>
 
-      {/* RIGHT SIDEBAR: Runtime & Health */}
-      <aside className="ide-sidebar-right glass-panel p-4 flex-col overflow-y-auto">
-        <h3 className="flex items-center gap-2 mb-4"><Activity size={18}/> Runtime Inspector</h3>
-        <RuntimeInspector />
-        
-        <h3 className="flex items-center gap-2 mt-8 mb-4"><Database size={18}/> Projection Health</h3>
-        <ProjectionHealthConsole />
-      </aside>
-
-      {/* FOOTER LEFT: Trace Timeline */}
-      <section className="glass-panel p-4 flex-col overflow-y-auto">
-        <h3 className="flex items-center gap-2 mb-4"><Clock size={18}/> Pipeline Timeline</h3>
-        <TraceTimeline />
-      </section>
-
-      {/* FOOTER RIGHT: Explanation */}
-      <section className="glass-panel p-4 flex-col overflow-y-auto">
-        <h3 className="flex items-center gap-2 mb-4"><Info size={18}/> Explainability</h3>
-        <ExplainabilityView />
-      </section>
-    </div>
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={cmdPaletteOpen}
+        onClose={() => setCmdPaletteOpen(false)}
+        onNavigate={navigate}
+      />
+    </>
   );
 }
 

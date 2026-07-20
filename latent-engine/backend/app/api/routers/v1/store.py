@@ -14,7 +14,7 @@ from app.adapters.database.sqlite_provider import get_provider
 from app.adapters.database.models import (
     WorkspaceRecord, RepositorySessionRecord, CommitRecord,
     DeveloperRecord, FileRecord, MeasurementRecord, EvidenceRecord,
-    ExecutionRecord, ReasoningRecord, DatasetRecord
+    ExecutionRecord, FactRecord, RuleExecutionRecord, DatasetRecord
 )
 
 router = APIRouter(prefix="/api/v1/store", tags=["Operational Store"])
@@ -23,6 +23,8 @@ router = APIRouter(prefix="/api/v1/store", tags=["Operational Store"])
 # ─────────────────────────────────────────────────────────
 # DTOs (simple — no engine internals exposed)
 # ─────────────────────────────────────────────────────────
+
+from typing import Dict, List, Optional, Any
 
 class TableStatsDTO(BaseModel):
     tables: Dict[str, int]
@@ -37,7 +39,7 @@ class ObjectSummaryDTO(BaseModel):
     workspace_id: Optional[str]
     execution_id: Optional[str]
     label: str
-    metadata: Dict[str, str] = {}
+    metadata: Dict[str, Any] = {}
 
 
 class SearchResultDTO(BaseModel):
@@ -74,6 +76,7 @@ def _summarize(record) -> ObjectSummaryDTO:
         workspace_id=identity.workspace_id,
         execution_id=identity.execution_id,
         label=label,
+        metadata=getattr(record, "metadata", {})
     )
 
 
@@ -131,8 +134,32 @@ async def list_workspaces(limit: int = 50, offset: int = 0):
 @router.get("/repositories")
 async def list_repository_sessions(workspace_id: Optional[str] = None, limit: int = 50, offset: int = 0):
     provider = get_provider()
-    records = provider.query(RepositorySessionRecord, limit=limit, offset=offset)
-    return {"items": [_summarize(r) for r in records], "total": provider.count(RepositorySessionRecord)}
+    records = provider.query(RepositorySessionRecord, limit=100000, offset=0)
+    if workspace_id:
+        records = [r for r in records if r.workspace_id == workspace_id or r.identity.workspace_id == workspace_id]
+
+    grouped: Dict[str, List[RepositorySessionRecord]] = {}
+    for record in records:
+        repo = (record.repository or "").strip().strip("/").lower()
+        branch = record.branch or "main"
+        if not repo:
+            continue
+        grouped.setdefault(f"{repo}:{branch}", []).append(record)
+
+    canonical: List[RepositorySessionRecord] = []
+    for group in grouped.values():
+        group.sort(key=lambda r: r.last_synced_at or r.identity.updated_at or r.identity.created_at, reverse=True)
+        primary = group[0]
+        primary.metadata = {
+            **(primary.metadata or {}),
+            "duplicate_session_count": max(0, len(group) - 1),
+            "canonical_repository_key": f"{(primary.repository or '').strip().strip('/').lower()}:{primary.branch or 'main'}",
+        }
+        canonical.append(primary)
+
+    canonical.sort(key=lambda r: r.last_synced_at or r.identity.updated_at or r.identity.created_at, reverse=True)
+    page = canonical[offset:offset + limit]
+    return {"items": [_summarize(r) for r in page], "total": len(canonical)}
 
 
 @router.get("/repositories/{session_id}", response_model=GenericObjectDTO)
@@ -275,8 +302,8 @@ async def get_execution(execution_id: str):
     if not record:
         raise HTTPException(404, detail="Execution not found")
     # Also fetch related reasoning
-    reasonings = provider.query(ReasoningRecord, limit=20)
-    related = [r for r in reasonings if r.execution_id == execution_id]
+    rule_executions = provider.query(RuleExecutionRecord, limit=20)
+    related = [r for r in rule_executions if r.identity.execution_id == execution_id]
     return {
         "object_id": record.identity.object_id,
         "created_at": record.identity.created_at,
@@ -296,11 +323,11 @@ async def get_execution(execution_id: str):
         "reasoning": [
             {
                 "reasoning_id": r.identity.object_id,
-                "reasoning_type": r.reasoning_type,
-                "conclusion": r.conclusion,
+                "reasoning_type": "rule_execution",
+                "conclusion": str(r.outputs),
                 "confidence": r.confidence,
-                "rules_fired": r.rules_fired,
-                "business_impact": r.business_impact,
+                "rules_fired": [r.rule_id],
+                "business_impact": r.outputs.get("impact", "low"),
             }
             for r in related
         ],

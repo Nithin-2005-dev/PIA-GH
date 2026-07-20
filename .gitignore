@@ -1,1 +1,8 @@
 __pycache__
+*.db
+*.db-*
+*.log
+.pytest_cache/
+latent-engine/backend/data/
+latent-engine/backend/*.git/
+latent-engine/backend/.pytest_cache/

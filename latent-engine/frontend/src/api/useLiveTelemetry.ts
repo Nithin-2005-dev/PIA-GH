@@ -25,33 +25,61 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   clearEvents: () => set({ events: [] })
 }));
 
+let wsInstance: WebSocket | null = null;
+let reconnectTimeout: any = null;
+
 export function useLiveTelemetry() {
   const { addEvent, setConnectionStatus } = useTelemetryStore();
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/ws/v1/runtime');
-    
-    setConnectionStatus('connecting');
-
-    ws.onopen = () => {
-      setConnectionStatus('connected');
-    };
-
-    ws.onmessage = (message) => {
-      try {
-        const data = JSON.parse(message.data) as TelemetryEvent;
-        addEvent(data);
-      } catch (e) {
-        console.error("Failed to parse telemetry event", e);
+    const connect = () => {
+      if (wsInstance && (wsInstance.readyState === WebSocket.OPEN || wsInstance.readyState === WebSocket.CONNECTING)) {
+        return;
       }
+      
+      const ws = new WebSocket('ws://localhost:8000/ws/v1/runtime');
+      wsInstance = ws;
+      
+      setConnectionStatus('connecting');
+
+      ws.onopen = () => {
+        setConnectionStatus('connected');
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+          reconnectTimeout = null;
+        }
+      };
+
+      ws.onmessage = (message) => {
+        try {
+          const data = JSON.parse(message.data);
+          addEvent(data);
+        } catch (e) {
+          console.error("Failed to parse telemetry event", e);
+        }
+      };
+
+      ws.onclose = () => {
+        setConnectionStatus('disconnected');
+        wsInstance = null;
+        reconnectTimeout = setTimeout(connect, 3000);
+      };
+      
+      ws.onerror = () => {
+        ws.close();
+      };
     };
 
-    ws.onclose = () => {
-      setConnectionStatus('disconnected');
-    };
+    connect();
 
     return () => {
-      ws.close();
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (wsInstance) {
+        wsInstance.close();
+        wsInstance = null;
+      }
     };
   }, []);
 }

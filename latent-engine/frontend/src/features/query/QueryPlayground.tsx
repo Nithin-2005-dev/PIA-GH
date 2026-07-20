@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export default function QueryPlayground() {

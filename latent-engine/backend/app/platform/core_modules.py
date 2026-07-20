@@ -526,6 +526,11 @@ class CausalPlatformModule(BaseModule):
             lambda _: CausalOntology(),
             scope=ServiceScope.SINGLETON,
         )
+        # NOTE: All 5 legacy RuleProviders have been retired and migrated to
+        # ReasoningRule wrappers (kg-v1.0 / rg-v1.0). The CausalRuleRegistry
+        # and CausalRuleEngine are retained here because CausalSemanticModelBuilder
+        # and CausalEngine still depend on them for ontology traversal, hypothesis
+        # generation, and explanation narratives — NOT for rule evaluation.
         services.add(
             CausalRuleRegistry,
             lambda _: default_rule_registry(),

@@ -1,4 +1,4 @@
-import React from 'react';
+import { Fragment } from 'react';
 import { useTelemetryStore } from '../../api/useLiveTelemetry';
 
 export default function TraceTimeline() {
@@ -56,13 +56,13 @@ export default function TraceTimeline() {
   return (
     <div className="flex gap-4 items-center overflow-x-auto p-2">
       {timelineSteps.map((step, idx) => (
-        <React.Fragment key={step.name}>
+        <Fragment key={step.name}>
           <div className="flex flex-col items-center flex-shrink-0">
             <div className="text-sm font-medium">{step.name}</div>
             <div className="text-xs text-accent-blue font-mono">{step.time}</div>
           </div>
           {idx < timelineSteps.length - 1 && <div className="text-muted">→</div>}
-        </React.Fragment>
+        </Fragment>
       ))}
     </div>
   );

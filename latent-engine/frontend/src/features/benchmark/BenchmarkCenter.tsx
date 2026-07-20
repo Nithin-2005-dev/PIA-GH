@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useTelemetryStore } from '../../api/useLiveTelemetry';
 
@@ -38,7 +38,9 @@ export default function BenchmarkCenter() {
 
       {isRunning && (
         <div className="mb-4">
-          <div className="text-sm mb-1 text-accent-blue">Executing ({latestEvent.progress}%)</div>
+          <div className="text-sm mb-1 text-accent-blue">
+            Executing ({latestEvent.progress}%){runningJob ? ` | ${runningJob.substring(0, 8)}` : ''}
+          </div>
           <div className="w-full bg-black bg-opacity-30 rounded h-2">
             <div className="bg-accent-blue h-2 rounded transition-all" style={{ width: `${latestEvent.progress}%` }}></div>
           </div>

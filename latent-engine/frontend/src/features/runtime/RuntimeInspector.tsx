@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTelemetryStore } from '../../api/useLiveTelemetry';
 import { ChevronRight, ChevronDown, CheckCircle, Clock } from 'lucide-react';
 

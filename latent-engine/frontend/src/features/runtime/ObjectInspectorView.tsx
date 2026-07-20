@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { ObjectInspector } from './ObjectInspector';
 
@@ -29,9 +29,9 @@ export default function ObjectInspectorView() {
         <div className="flex flex-col h-full">
             <div className="flex gap-2 mb-4 p-4 glass-panel items-center">
                 <Search size={18} className="text-muted" />
-                <input 
-                    type="text" 
-                    placeholder="Enter Object ID (Commit, Developer, Projection, Measurement...)" 
+                <input
+                    type="text"
+                    placeholder="Enter Object ID (Commit, Developer, Projection, Measurement...)"
                     value={objectId}
                     onChange={e => setObjectId(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && fetchObject(objectId)}
@@ -39,7 +39,7 @@ export default function ObjectInspectorView() {
                 />
                 <button onClick={() => fetchObject(objectId)}>Inspect</button>
             </div>
-            
+
             <div className="flex-1 overflow-hidden">
                 {loading && <div className="text-muted p-4">Loading object...</div>}
                 {error && <div className="text-red-500 p-4">{error}</div>}
