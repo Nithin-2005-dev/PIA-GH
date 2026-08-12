@@ -41,8 +41,11 @@ async def startup_event():
     from app.platform.events.store import get_event_store
     from app.platform.events.store import StoreEvent, EventType
     from app.platform.sync_watcher import get_sync_watcher
+    from app.platform.event_bus import get_event_bus
     get_provider()  # initializes tables
     event_store = get_event_store()  # initializes event log
+    event_bus = get_event_bus()
+    await event_bus.start()
     event_store.append(StoreEvent(
         event_type=EventType.SYSTEM_STARTED.value,
         source_component="server",
@@ -56,8 +59,11 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     from app.platform.sync_watcher import get_sync_watcher
+    from app.platform.event_bus import get_event_bus
     watcher = get_sync_watcher()
     await watcher.stop()
+    event_bus = get_event_bus()
+    await event_bus.stop()
 
 
 # ─────────────────────────────────────────────────────────

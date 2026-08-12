@@ -160,8 +160,9 @@ async def get_sync_history(limit: int = 20):
 async def get_rate_limit(github_token: Optional[str] = None):
     """Current GitHub API rate limit status."""
     from app.platform.sync_engine import GitHubSourcePlugin
+    import asyncio
     plugin = GitHubSourcePlugin(token=github_token)
-    r = plugin.get_rate_limit()
+    r = await asyncio.to_thread(plugin.get_rate_limit)
     return RateLimitResponse(remaining=r.get("remaining", 0), limit=r.get("limit", 0), reset_at=r.get("reset_at", 0))
 
 

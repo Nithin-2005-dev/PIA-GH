@@ -432,13 +432,18 @@ class SyncEngine:
         event_store: ImmutableEventStore,
         projection_engine: Any,             # ProjectionEngine (imported lazily)
         broadcaster: Any = None,            # WebSocket broadcaster
+        event_bus: Any = None,              # Async EventBus
     ):
         self._provider = provider
         self._event_store = event_store
         self._projection_engine = projection_engine
         self._broadcaster = broadcaster
+        self._event_bus = event_bus
         self._active_jobs: Dict[str, SyncJob] = {}
         self._history: List[SyncJob] = []   # completed jobs
+        
+        if self._event_bus:
+            self._event_bus.subscribe_async("sync.requested", self._handle_sync_requested)
 
     # ─── Public API ──────────────────────────────────────────
 
@@ -462,8 +467,26 @@ class SyncEngine:
             workspace_id=workspace_id or "",
         )
         self._active_jobs[job.job_id] = job
-        asyncio.create_task(self._run_job(job, github_token))
+        
+        if self._event_bus:
+            from app.platform.event_bus import PlatformEvent
+            self._event_bus.publish(PlatformEvent(
+                type="sync.requested",
+                payload={"job_id": job.job_id, "github_token": github_token}
+            ))
+        else:
+            # Fallback for tests
+            asyncio.create_task(self._run_job(job, github_token))
+            
         return job
+
+    async def _handle_sync_requested(self, event) -> None:
+        payload = event.payload
+        job_id = payload.get("job_id")
+        github_token = payload.get("github_token")
+        job = self._active_jobs.get(job_id)
+        if job:
+            await self._run_job(job, github_token)
 
     async def cancel(self, job_id: str) -> bool:
         job = self._active_jobs.get(job_id)
@@ -927,6 +950,7 @@ def get_sync_engine(broadcaster: Any = None) -> SyncEngine:
         from app.adapters.database.sqlite_provider import get_provider
         from app.platform.events.store import get_event_store
         from app.platform.projections.engine import get_projection_engine
+        from app.platform.event_bus import get_event_bus
         
         if broadcaster is None:
             try:
@@ -940,5 +964,6 @@ def get_sync_engine(broadcaster: Any = None) -> SyncEngine:
             event_store=get_event_store(),
             projection_engine=get_projection_engine(),
             broadcaster=broadcaster,
+            event_bus=get_event_bus(),
         )
     return _engine
